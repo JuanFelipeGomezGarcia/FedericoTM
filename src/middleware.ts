@@ -5,9 +5,8 @@ import jwt from 'jsonwebtoken'
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 
 export function middleware(request: NextRequest) {
-  // Protect admin routes
-  if (request.nextUrl.pathname.startsWith('/api/admin') ||
-      request.nextUrl.pathname.startsWith('/admin')) {
+  // Protect admin API routes only
+  if (request.nextUrl.pathname.startsWith('/api/admin')) {
 
     const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
                   request.cookies.get('admin-token')?.value
@@ -27,5 +26,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/admin/:path*', '/admin/:path*'],
+  matcher: ['/api/admin/:path*'],
 }

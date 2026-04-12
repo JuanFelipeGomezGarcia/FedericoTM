@@ -50,32 +50,10 @@ export async function POST(request: NextRequest) {
 
 function generateRoundRobinMatches(players: any[]) {
   const matches = []
-  const n = players.length
-
-  if (n < 2) return matches
-
-  // If odd number of players, add a bye round
-  const hasBye = n % 2 === 1
-  const rounds = hasBye ? n : n - 1
-
-  for (let round = 0; round < rounds; round++) {
-    for (let i = 0; i < Math.floor(n / 2); i++) {
-      const player1 = players[i]
-      const player2 = players[n - 1 - i]
-
-      if (player1 && player2) {
-        matches.push({
-          player1,
-          player2,
-          round: round + 1
-        })
-      }
+  for (let i = 0; i < players.length; i++) {
+    for (let j = i + 1; j < players.length; j++) {
+      matches.push({ player1: players[i], player2: players[j] })
     }
-
-    // Rotate players (keep first player fixed, rotate others)
-    const first = players.shift()
-    players.push(first!)
   }
-
   return matches
 }

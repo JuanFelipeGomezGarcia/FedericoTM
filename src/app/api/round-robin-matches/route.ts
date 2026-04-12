@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       params = [groupId]
     }
 
-    query += ' ORDER BY rrm.id'
+    query += ' ORDER BY rrm.group_id, rrm.id'
 
     const result = await pool.query(query, params)
     return NextResponse.json(result.rows)
@@ -49,16 +49,45 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT for updating match results
 export async function PUT(request: NextRequest) {
   try {
-    const { id, result, winner_id } = await request.json()
-    const resultQuery = await pool.query(
+    const { id, result } = await request.json()
+
+    // Validate format #-#
+    if (result !== null && result !== '') {
+      const regex = /^\d+-\d+$/
+      if (!regex.test(result)) {
+        return NextResponse.json({ error: 'Formato inválido. Usa #-# (ej: 3-1)' }, { status: 400 })
+      }
+    }
+
+    let winner_id: number | null = null
+
+    if (result && result !== '') {
+      const matchResult = await pool.query('SELECT * FROM round_robin_matches WHERE id = $1', [id])
+      const match = matchResult.rows[0]
+      if (!match) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
+
+      // Check category is not finished
+      const catResult = await pool.query('SELECT is_finished FROM categories WHERE id = $1', [match.category_id])
+      if (catResult.rows[0]?.is_finished) {
+        return NextResponse.json({ error: 'Category is finished' }, { status: 403 })
+      }
+
+      const parts = result.split('-').map((n: string) => parseInt(n))
+      const [s1, s2] = parts
+      if (s1 > s2) winner_id = match.player1_id
+      else if (s2 > s1) winner_id = match.player2_id
+      else winner_id = null // draw (shouldn't happen in table tennis but handle gracefully)
+    }
+
+    const updated = await pool.query(
       'UPDATE round_robin_matches SET result = $1, winner_id = $2 WHERE id = $3 RETURNING *',
-      [result, winner_id, id]
+      [result || null, winner_id, id]
     )
-    return NextResponse.json(resultQuery.rows[0])
+    return NextResponse.json(updated.rows[0])
   } catch (error) {
+    console.error(error)
     return NextResponse.json({ error: 'Error updating match result' }, { status: 500 })
   }
 }

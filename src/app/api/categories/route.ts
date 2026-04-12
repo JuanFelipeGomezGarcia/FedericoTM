@@ -59,9 +59,36 @@ export async function POST(request: NextRequest) {
     )
     await Promise.all(gpInserts)
 
+    // Auto-generate round robin matches for each group
+    for (const groupId of groupIds) {
+      const playersResult = await pool.query(`
+        SELECT p.* FROM players p
+        JOIN group_players gp ON p.id = gp.player_id
+        WHERE gp.group_id = $1 ORDER BY gp.position
+      `, [groupId])
+      const groupPlayersList = playersResult.rows
+      const rMatches = generateRoundRobinMatches(groupPlayersList)
+      for (const match of rMatches) {
+        await pool.query(
+          'INSERT INTO round_robin_matches (category_id, group_id, player1_id, player2_id) VALUES ($1, $2, $3, $4)',
+          [category.id, groupId, match.player1.id, match.player2.id]
+        )
+      }
+    }
+
     return NextResponse.json(category, { status: 201 })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Error creating category' }, { status: 500 })
   }
+}
+
+function generateRoundRobinMatches(players: any[]) {
+  const matches: { player1: any; player2: any }[] = []
+  for (let i = 0; i < players.length; i++) {
+    for (let j = i + 1; j < players.length; j++) {
+      matches.push({ player1: players[i], player2: players[j] })
+    }
+  }
+  return matches
 }

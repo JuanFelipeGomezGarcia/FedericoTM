@@ -12,7 +12,8 @@ CREATE TABLE categories (
   tournament_id INTEGER REFERENCES tournaments(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   players_per_group INTEGER NOT NULL,
-  qualified_per_group INTEGER NOT NULL
+  qualified_per_group INTEGER NOT NULL,
+  is_finished BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE players (
@@ -53,7 +54,15 @@ CREATE TABLE elimination_matches (
   player2_id INTEGER REFERENCES players(id),
   result VARCHAR(10),
   winner_id INTEGER REFERENCES players(id),
-  bye BOOLEAN DEFAULT FALSE
+  bye BOOLEAN DEFAULT FALSE,
+  next_match_number INTEGER
+);
+
+CREATE TABLE manual_tiebreaks (
+  group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+  player_id INTEGER REFERENCES players(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  PRIMARY KEY (group_id, player_id)
 );
 
 -- Índices para rendimiento
