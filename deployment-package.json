@@ -1,0 +1,16 @@
+{
+  "name": "federico-tm",
+  "version": "1.0.0",
+  "description": "Table tennis tournament management application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "8080"
+  }
+}

@@ -1,12 +1,77 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+interface Tournament {
+  id: number
+  name: string
+  date: string
+  status: string
+}
+
 export default function Home() {
+  const [tournaments, setTournaments] = useState<Tournament[]>([])
+
+  useEffect(() => {
+    fetchTournaments()
+  }, [])
+
+  const fetchTournaments = async () => {
+    const response = await fetch('/api/tournaments')
+    const data = await response.json()
+    setTournaments(data)
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-in-200/30 lg:static lg:w-auto lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Gestión de Torneos de Tenis de Mesa
-        </p>
-      </div>
-      <h1 className="text-4xl font-bold">Bienvenido a Federico TM</h1>
-    </main>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <h1 className="text-3xl font-bold text-gray-900">Federico TM</h1>
+            <Link href="/admin">
+              <Button>Panel Admin</Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Torneos Disponibles</h2>
+
+          {tournaments.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <p className="text-gray-500">No hay torneos disponibles en este momento.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {tournaments.map((tournament) => (
+                <Card key={tournament.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <CardTitle>{tournament.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 mb-4">
+                      Fecha: {new Date(tournament.date).toLocaleDateString('es-ES')}
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Estado: {tournament.status}
+                    </p>
+                    <Link href={`/tournament/${tournament.id}`}>
+                      <Button className="w-full">Ver Torneo</Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
   )
 }
