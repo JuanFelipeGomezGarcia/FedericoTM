@@ -27,6 +27,11 @@ export default function TournamentPage() {
   const [tournament, setTournament] = useState<Tournament | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    setIsAdmin(!!localStorage.getItem('admin-token'))
+  }, [])
 
   useEffect(() => {
     if (!tournamentId) return
@@ -74,9 +79,9 @@ export default function TournamentPage() {
             </div>
             <span className="font-bold text-foreground">Federico TM</span>
           </div>
-          <Link href="/" className="btn-secondary py-1.5 px-3 text-xs">
+          <Link href={isAdmin ? '/admin' : '/'} className="btn-secondary py-1.5 px-3 text-xs">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Inicio
+            {isAdmin ? 'Panel Admin' : 'Inicio'}
           </Link>
         </div>
       </header>
@@ -85,9 +90,9 @@ export default function TournamentPage() {
       <section className="relative overflow-hidden border-b border-border/50">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-blue-600/5 pointer-events-none" />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-          <Link href="/" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-6 transition-colors">
+          <Link href={isAdmin ? '/admin' : '/'} className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-6 transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Todos los torneos
+            {isAdmin ? 'Panel Admin' : 'Todos los torneos'}
           </Link>
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>

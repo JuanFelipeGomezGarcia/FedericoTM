@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Trophy, LogOut, Shield, Eye, EyeOff, LayoutDashboard, Home } from 'lucide-react'
 
 interface AdminLayoutProps {
@@ -18,6 +18,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
   const pathname = usePathname()
+  const router = useRouter()
 
   useEffect(() => {
     const token = localStorage.getItem('admin-token')
@@ -54,6 +55,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     setIsLoggedIn(false)
     setUsername('')
     setPassword('')
+    router.push('/')
   }
 
   if (checking) {
@@ -164,10 +166,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <span className="font-bold text-foreground">Federico TM</span>
             </div>
             <div className="hidden sm:flex items-center gap-1 ml-4">
-              <Link href="/" className={pathname === '/' ? 'nav-link-active' : 'nav-link'}>
-                <Home className="w-4 h-4" />
-                Inicio
-              </Link>
               <Link href="/admin" className={pathname === '/admin' ? 'nav-link-active' : 'nav-link'}>
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard

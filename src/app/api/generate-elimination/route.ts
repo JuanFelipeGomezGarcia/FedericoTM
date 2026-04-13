@@ -52,13 +52,15 @@ export async function POST(request: NextRequest) {
 
     // Round 1: bracketSize/2 matches
     const round1Matches = bracketSize / 2
+    const hasNextRound = Math.log2(bracketSize) > 1
     for (let i = 0; i < round1Matches; i++) {
       const p1 = slots[i * 2]
       const p2 = slots[i * 2 + 1]
       const isBye = p1 === null || p2 === null
+      const nextMatchNumber = hasNextRound ? Math.floor(i / 2) + 1 : null
       await pool.query(
         'INSERT INTO elimination_matches (category_id, round, match_number, player1_id, player2_id, bye, next_match_number) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [categoryId, 1, i + 1, p1?.id || null, p2?.id || null, isBye, Math.floor(i / 2) + 1]
+        [categoryId, 1, i + 1, p1?.id || null, p2?.id || null, isBye, nextMatchNumber]
       )
     }
 

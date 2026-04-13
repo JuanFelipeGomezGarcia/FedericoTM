@@ -307,10 +307,20 @@ export default function CategoryPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-5">
             <div>
-              <Link href={`/tournament/${tournamentId}`} className="text-cyan-400 hover:text-cyan-300 text-sm">
-                ← Volver al Torneo
+              <Link
+                href={isAdmin ? `/admin` : `/tournament/${tournamentId}`}
+                className="text-cyan-400 hover:text-cyan-300 text-sm"
+              >
+                {isAdmin ? '← Panel Admin' : '← Volver al Torneo'}
               </Link>
-              <h1 className="text-2xl font-bold text-foreground mt-1">{category.name}</h1>
+              <div className="flex items-center gap-3 mt-1">
+                {isAdmin && (
+                  <Link href={`/tournament/${tournamentId}`} className="text-muted-foreground hover:text-foreground text-xs">
+                    ← Torneo
+                  </Link>
+                )}
+                <h1 className="text-2xl font-bold text-foreground">{category.name}</h1>
+              </div>
             </div>
             <div className="flex gap-2">
               {hasElimination && (

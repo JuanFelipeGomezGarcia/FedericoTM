@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const result = await pool.query(`
+    const url = new URL(request.url)
+    const tournamentId = url.searchParams.get('tournamentId')
+
+    let query = `
       SELECT c.*, t.name as tournament_name
       FROM categories c
       JOIN tournaments t ON c.tournament_id = t.id
-      ORDER BY c.id
-    `)
+    `
+    const params: Array<string | number> = []
+
+    if (tournamentId) {
+      const id = Number(tournamentId)
+      if (Number.isNaN(id)) {
+        return NextResponse.json({ error: 'Invalid tournamentId' }, { status: 400 })
+      }
+      query += ' WHERE c.tournament_id = $1'
+      params.push(id)
+    }
+
+    query += ' ORDER BY c.id'
+
+    const result = await pool.query(query, params)
     return NextResponse.json(result.rows)
   } catch (error) {
     return NextResponse.json({ error: 'Error fetching categories' }, { status: 500 })
@@ -42,12 +58,17 @@ export async function POST(request: NextRequest) {
     const groupResults = await Promise.all(groupInserts)
     const groupIds = groupResults.map(r => r.rows[0].id)
 
-    // Distribute players in zig-zag
+    // Distribute players in alternating blocks
     const groupPlayers = []
+    const blockSize = numGroups
     for (let i = 0; i < playerNames.length; i++) {
-      const groupIndex = i % (2 * numGroups) < numGroups ? i % numGroups : numGroups - 1 - (i % numGroups)
+      const blockIndex = Math.floor(i / blockSize)
+      const inBlockIndex = i % blockSize
+      const isReverse = blockIndex % 2 === 1
+      const groupIndex = isReverse ? blockSize - 1 - inBlockIndex : inBlockIndex
       groupPlayers.push({ groupId: groupIds[groupIndex], playerIndex: i, position: Math.floor(i / numGroups) + 1 })
     }
+
 
     // Get player ids
     const playerResult = await pool.query('SELECT id FROM players WHERE category_id = $1 ORDER BY id', [category.id])
