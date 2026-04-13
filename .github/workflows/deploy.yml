@@ -33,7 +33,7 @@ jobs:
           password: ${{ secrets.EC2_PASSWORD }}
           source: ".next"
           target: "/home/ubuntu/FedericoTM"
-          rm: true
+          rm: false
 
       - name: Restart app
         uses: appleboy/ssh-action@master
