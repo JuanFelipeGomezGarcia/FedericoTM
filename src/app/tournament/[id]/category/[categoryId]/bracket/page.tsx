@@ -31,6 +31,7 @@ export default function BracketPage() {
   const [matches, setMatches] = useState<Match[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [saving, setSaving] = useState<number | null>(null)
+  const [confirmingSlot, setConfirmingSlot] = useState<string | null>(null)
 
   useEffect(() => { setIsAdmin(!!localStorage.getItem('admin-token')) }, [])
 
@@ -42,6 +43,7 @@ export default function BracketPage() {
   useEffect(() => { fetchMatches() }, [fetchMatches])
 
   const setWinner = async (matchId: number, winnerId: number) => {
+    setConfirmingSlot(null)
     setSaving(matchId)
     const token = localStorage.getItem('admin-token')
     const res = await fetch('/api/elimination-matches', {
@@ -74,6 +76,9 @@ export default function BracketPage() {
 
   const rounds = Array.from(new Set(matches.map(m => m.round))).sort((a, b) => a - b)
   const totalRounds = rounds.length
+  
+  const finalMatch = matches.find(m => m.round === totalRounds && m.match_number === 1)
+  const isFinished = !!finalMatch?.winner_id
 
   const roundLabel = (round: number) => {
     const fromEnd = totalRounds - round
@@ -207,7 +212,9 @@ export default function BracketPage() {
           {matches.map(match => {
             const x = colX(match.round)
             const y = matchY[match.round]?.[match.match_number] ?? 0
-            const canSetWinner = isAdmin && !match.winner_id && !match.bye && !!match.player1_id && !!match.player2_id
+            
+            const nextMatch = matches.find(m => m.round === match.round + 1 && m.match_number === Math.ceil(match.match_number / 2))
+            const canSetWinner = isAdmin && !isFinished && !match.bye && !!match.player1_id && !!match.player2_id && (!nextMatch || !nextMatch.winner_id)
 
             return (
               <div
@@ -222,6 +229,10 @@ export default function BracketPage() {
                   canClick={!!canSetWinner}
                   saving={saving === match.id}
                   onClick={() => match.player1_id && setWinner(match.id, match.player1_id)}
+                  position={match.round === 1 ? match.match_number * 2 - 1 : undefined}
+                  isConfirming={confirmingSlot === `${match.id}-${match.player1_id}`}
+                  onStartConfirm={() => match.player1_id && setConfirmingSlot(`${match.id}-${match.player1_id}`)}
+                  onCancelConfirm={() => setConfirmingSlot(null)}
                 />
                 <div className="border-t border-border/50 mx-2" />
                 <PlayerRow
@@ -231,6 +242,10 @@ export default function BracketPage() {
                   canClick={!!canSetWinner && match.bye !== true && match.bye !== 'true'}
                   saving={saving === match.id}
                   onClick={() => match.player2_id && setWinner(match.id, match.player2_id)}
+                  position={match.round === 1 ? match.match_number * 2 : undefined}
+                  isConfirming={confirmingSlot === `${match.id}-${match.player2_id}`}
+                  onStartConfirm={() => match.player2_id && setConfirmingSlot(`${match.id}-${match.player2_id}`)}
+                  onCancelConfirm={() => setConfirmingSlot(null)}
                 />
               </div>
             )
@@ -243,7 +258,7 @@ export default function BracketPage() {
 }
 
 function PlayerRow({
-  name, playerId, winnerId, canClick, saving, onClick
+  name, playerId, winnerId, canClick, saving, onClick, position, isConfirming, onStartConfirm, onCancelConfirm
 }: {
   name: string | null
   playerId: number | null
@@ -251,14 +266,41 @@ function PlayerRow({
   canClick: boolean
   saving: boolean
   onClick: () => void
+  position?: number
+  isConfirming?: boolean
+  onStartConfirm?: () => void
+  onCancelConfirm?: () => void
 }) {
   const isWinner = !!playerId && winnerId === playerId
   const isLoser  = !!winnerId && !!playerId && winnerId !== playerId
 
+  useEffect(() => {
+    if (isConfirming && onCancelConfirm) {
+      onCancelConfirm()
+    }
+  }, [winnerId, playerId])
+
+  const handleClick = () => {
+    if (!canClick || saving) return
+    if (!isConfirming && onStartConfirm) {
+      onStartConfirm()
+    }
+  }
+
+  const handleConfirm = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onCancelConfirm) onCancelConfirm()
+    onClick()
+  }
+
+  const handleCancel = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onCancelConfirm) onCancelConfirm()
+  }
+
   return (
-    <button
-      disabled={!canClick || saving}
-      onClick={onClick}
+    <div
+      onClick={handleClick}
       style={{ height: PLAYER_H }}
       className={`w-full flex items-center gap-2 px-3 text-xs transition-all
         ${canClick ? 'hover:bg-cyan-500/10 cursor-pointer' : 'cursor-default'}
@@ -266,6 +308,13 @@ function PlayerRow({
         ${saving ? 'opacity-50' : ''}
       `}
     >
+      {/* Position */}
+      {position !== undefined && (
+        <span className="text-[10px] text-muted-foreground/60 w-4 font-mono text-left select-none">
+          {position}
+        </span>
+      )}
+
       {/* Indicador */}
       <span className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 flex items-center justify-center transition-colors ${
         isWinner ? 'bg-cyan-500 border-cyan-500' : 'border-border'
@@ -286,6 +335,20 @@ function PlayerRow({
       }`}>
         {name ?? 'Por definir'}
       </span>
-    </button>
+
+      {/* Confirmación */}
+      {isConfirming && (
+        <div className="flex gap-1 ml-auto">
+          <button
+            onClick={handleConfirm}
+            className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400"
+          >✓</button>
+          <button
+            onClick={handleCancel}
+            className="text-[10px] px-1.5 py-0.5 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground"
+          >✕</button>
+        </div>
+      )}
+    </div>
   )
 }

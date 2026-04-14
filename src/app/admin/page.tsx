@@ -50,7 +50,12 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/tournaments')
       const data = await res.json()
-      setTournaments(data)
+      if (Array.isArray(data)) {
+        setTournaments(data)
+      } else {
+        setTournaments([])
+        console.error('Failed to load tournaments:', data)
+      }
     } finally {
       setLoading(false)
     }

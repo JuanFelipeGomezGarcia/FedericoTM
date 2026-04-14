@@ -18,8 +18,19 @@ export default function Home() {
   useEffect(() => {
     fetch('/api/tournaments')
       .then(r => r.json())
-      .then(data => { setTournaments(data); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(data => {
+        if (Array.isArray(data)) {
+          setTournaments(data)
+        } else {
+          setTournaments([]) // Fallback to empty array if API returns error
+          console.error('Failed to load tournaments:', data)
+        }
+        setLoading(false)
+      })
+      .catch((e) => {
+        console.error('Error fetching tournaments:', e)
+        setLoading(false)
+      })
   }, [])
 
   const active = tournaments.filter(t => t.status === 'En curso')

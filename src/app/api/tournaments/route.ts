@@ -6,6 +6,7 @@ export async function GET() {
     const result = await pool.query('SELECT * FROM tournaments ORDER BY date DESC')
     return NextResponse.json(result.rows)
   } catch (error) {
+    console.error('GET /api/tournaments error:', error)
     return NextResponse.json({ error: 'Error fetching tournaments' }, { status: 500 })
   }
 }
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
     )
     return NextResponse.json(result.rows[0], { status: 201 })
   } catch (error) {
+    console.error('POST /api/tournaments error:', error)
     return NextResponse.json({ error: 'Error creating tournament' }, { status: 500 })
   }
 }

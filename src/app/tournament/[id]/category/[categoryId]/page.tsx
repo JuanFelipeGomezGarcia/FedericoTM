@@ -455,8 +455,10 @@ export default function CategoryPage() {
                 </Card>
               )}
 
-              {/* ── Tabla cruzada ── */}
-              {players.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                <div className="space-y-4">
+                  {/* ── Tabla cruzada ── */}
+                  {players.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Tabla de Resultados</CardTitle>
@@ -567,9 +569,11 @@ export default function CategoryPage() {
                   </CardContent>
                 </Card>
               )}
+                </div>
 
-              {/* ── Tabla de posiciones ── */}
-              {gStandings.length > 0 && (
+                <div className="space-y-4">
+                  {/* ── Tabla de posiciones ── */}
+                  {gStandings.length > 0 && (
                 <Card>
                   <CardHeader>
                     <div className="flex justify-between items-center">
@@ -631,6 +635,8 @@ export default function CategoryPage() {
                   </CardContent>
                 </Card>
               )}
+                </div>
+              </div>
             </div>
           )
         })}
