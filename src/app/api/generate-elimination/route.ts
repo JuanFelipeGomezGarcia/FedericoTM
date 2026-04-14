@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { getGroupStandings } from '../standings/route'
 
+interface BracketPlayer {
+  id: number
+  groupId: number
+  rankInGroup: number
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { categoryId } = await request.json()
@@ -13,58 +19,113 @@ export async function POST(request: NextRequest) {
     // Delete existing elimination matches
     await pool.query('DELETE FROM elimination_matches WHERE category_id = $1', [categoryId])
 
-    const groupsResult = await pool.query('SELECT id FROM groups WHERE category_id = $1 ORDER BY name', [categoryId])
+    const groupsResult = await pool.query('SELECT id, name FROM groups WHERE category_id = $1 ORDER BY name', [categoryId])
     const groups = groupsResult.rows
 
     // Get qualified players per group in order
-    const qualifiedPerGroup: any[][] = []
+    const firstPlaces: BracketPlayer[] = []
+    const otherPlaces: BracketPlayer[] = []
+    let totalPlayers = 0
+
     for (const group of groups) {
       const standings = await getGroupStandings(group.id)
-      qualifiedPerGroup.push(standings.slice(0, category.qualified_per_group))
+      const qualified = standings.slice(0, category.qualified_per_group)
+      qualified.forEach((p: any, idx: number) => {
+        totalPlayers++
+        const b = { id: p.id, groupId: group.id, rankInGroup: idx + 1 }
+        if (idx === 0) firstPlaces.push(b)
+        else otherPlaces.push(b)
+      })
     }
 
-    // Build seeded list: 1st of G1, 1st of G2, ..., 2nd of G1, 2nd of G2, ...
-    const seededPlayers: any[] = []
-    const maxQualified = Math.max(...qualifiedPerGroup.map(g => g.length))
-    for (let rank = 0; rank < maxQualified; rank++) {
-      for (const groupQ of qualifiedPerGroup) {
-        if (groupQ[rank]) seededPlayers.push(groupQ[rank])
-      }
+    if (totalPlayers < 2) return NextResponse.json({ error: 'Not enough qualified players' }, { status: 400 })
+
+    const bracketSize = nextPow2(totalPlayers)
+    const byesCount = bracketSize - totalPlayers
+    const standardSlots = buildStandardSlots(bracketSize)
+
+    const isBye = (seed: number) => seed > bracketSize - byesCount
+    const assignments = new Map<number, number>() // playerId -> seed
+
+    let availableSeeds = Array.from({length: bracketSize}, (_, i) => i + 1).filter(s => !isBye(s))
+
+    const seedPools = [
+       [1], [2], [3, 4], [5, 6, 7, 8],
+       Array.from({length: 8}, (_,i)=>i+9),
+       Array.from({length: 16},(_,i)=>i+17)
+    ]
+
+    let currentPoolIdx = 0
+    let currentPool = [...seedPools[currentPoolIdx]]
+
+    // Assign 1st places
+    for (const p of firstPlaces) {
+       if (currentPool.length === 0) {
+           currentPoolIdx++
+           if (seedPools[currentPoolIdx]) {
+               currentPool = [...seedPools[currentPoolIdx]]
+           } else {
+               currentPool = []
+               break
+           }
+       }
+       const rndIdx = Math.floor(Math.random() * currentPool.length)
+       const pickedSeed = currentPool.splice(rndIdx, 1)[0]
+       
+       assignments.set(p.id, pickedSeed)
+       availableSeeds = availableSeeds.filter(s => s !== pickedSeed)
     }
 
-    const totalSeeds = seededPlayers.length
-    if (totalSeeds < 2) return NextResponse.json({ error: 'Not enough qualified players' }, { status: 400 })
+    // Assign others via backtracking to ensure maximum separation from same group
+    function solve(playerIndex: number): boolean {
+        if (playerIndex === otherPlaces.length) return true
+        const p = otherPlaces[playerIndex]
+        const shuffled = [...availableSeeds].sort(() => Math.random() - 0.5)
+        
+        for (const seed of shuffled) {
+            if (isValid(p, seed, assignments, standardSlots, bracketSize, firstPlaces, otherPlaces)) {
+                assignments.set(p.id, seed)
+                availableSeeds = availableSeeds.filter(s => s !== seed)
+                
+                if (solve(playerIndex + 1)) return true
+                
+                availableSeeds.push(seed)
+                assignments.delete(p.id)
+            }
+        }
+        return false
+    }
 
-    // Bracket size: next power of 2
-    const bracketSize = nextPow2(totalSeeds)
+    if (!solve(0)) {
+       console.log('Could not find strict separation, using random mapping for remaining.')
+       const shuffled = [...availableSeeds].sort(() => Math.random() - 0.5)
+       for (let i = 0; i < otherPlaces.length; i++) {
+           assignments.set(otherPlaces[i].id, shuffled[i])
+       }
+    }
 
-    // Posiciones estándar de bracket: seed1 arriba, seed2 abajo, enfrentados en la final
-    // Para bracketSize=8: matches son (1v8),(5v4),(3v6),(7v2) → seed1 arriba, seed2 abajo
-    const seedSlots = buildBracketSlots(bracketSize)
-    // seedSlots[i] = número de seed que va en la posición i (0-indexed)
-    // Los byes van a los mejores seeds: si hay 6 jugadores y bracket de 8,
-    // seeds 1 y 2 reciben bye (posiciones donde el rival sería seed 7 u 8 que no existen)
+    const slots: (number | null)[] = standardSlots.map(seed => {
+       if (isBye(seed)) return null
+       for (const [pid, s] of assignments.entries()) {
+           if (s === seed) return pid
+       }
+       return null 
+    })
 
-    // Construir array de jugadores por slot: null = BYE
-    const slots: (any | null)[] = seedSlots.map(seed =>
-      seed <= totalSeeds ? seededPlayers[seed - 1] : null
-    )
-
-    // Round 1: bracketSize/2 matches
     const round1Matches = bracketSize / 2
     const hasNextRound = Math.log2(bracketSize) > 1
+    
     for (let i = 0; i < round1Matches; i++) {
       const p1 = slots[i * 2]
       const p2 = slots[i * 2 + 1]
-      const isBye = p1 === null || p2 === null
+      const isMatchBye = p1 === null || p2 === null
       const nextMatchNumber = hasNextRound ? Math.floor(i / 2) + 1 : null
       await pool.query(
         'INSERT INTO elimination_matches (category_id, round, match_number, player1_id, player2_id, bye, next_match_number) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [categoryId, 1, i + 1, p1?.id || null, p2?.id || null, isBye, nextMatchNumber]
+        [categoryId, 1, i + 1, p1 || null, p2 || null, isMatchBye, nextMatchNumber]
       )
     }
 
-    // Generate subsequent rounds as empty placeholders
     const numRounds = Math.log2(bracketSize)
     for (let r = 2; r <= numRounds; r++) {
       const matchesInRound = bracketSize / Math.pow(2, r)
@@ -76,7 +137,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Auto-advance BYE winners in round 1
     const byeMatches = await pool.query(
       'SELECT * FROM elimination_matches WHERE category_id = $1 AND round = 1 AND bye = true',
       [categoryId]
@@ -89,7 +149,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ message: 'Elimination bracket generated', bracketSize, totalSeeds })
+    return NextResponse.json({ message: 'Elimination bracket generated perfectly', bracketSize, totalPlayers })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Error generating elimination bracket' }, { status: 500 })
@@ -101,29 +161,24 @@ async function advanceWinner(categoryId: number, round: number, matchNumber: num
     'SELECT next_match_number FROM elimination_matches WHERE category_id = $1 AND round = $2 AND match_number = $3',
     [categoryId, round, matchNumber]
   )
-  console.log('[advanceWinner] currentMatch rows:', currentMatch.rows)
   if (currentMatch.rows.length === 0) return
   const nextMatchNum = currentMatch.rows[0].next_match_number
-  console.log('[advanceWinner] next_match_number:', nextMatchNum)
   if (!nextMatchNum) return
 
   const nextRound = round + 1
   const isPlayer1Slot = matchNumber % 2 === 1
-  console.log('[advanceWinner] advancing to round:', nextRound, 'match:', nextMatchNum, 'slot:', isPlayer1Slot ? 'player1' : 'player2')
 
   const nextMatch = await pool.query(
     'SELECT * FROM elimination_matches WHERE category_id = $1 AND round = $2 AND match_number = $3',
     [categoryId, nextRound, nextMatchNum]
   )
-  console.log('[advanceWinner] nextMatch rows:', nextMatch.rows.length)
   if (nextMatch.rows.length === 0) return
 
   const field = isPlayer1Slot ? 'player1_id' : 'player2_id'
-  const res = await pool.query(
+  await pool.query(
     `UPDATE elimination_matches SET ${field} = $1 WHERE category_id = $2 AND round = $3 AND match_number = $4 RETURNING id`,
     [winnerId, categoryId, nextRound, nextMatchNum]
   )
-  console.log('[advanceWinner] updated next match id:', res.rows[0]?.id)
 }
 
 function nextPow2(n: number) {
@@ -132,21 +187,54 @@ function nextPow2(n: number) {
   return p
 }
 
-// Algoritmo estándar de bracket:
-// seed1 arriba (slot 0), seed2 abajo (slot size-1), nunca se pueden encontrar antes de la final
-// Los byes van contra los mejores seeds (seeds 1, 2, 3... en orden)
-function buildBracketSlots(size: number): number[] {
-  let slots = [1]
-  while (slots.length < size) {
-    const next: number[] = []
-    const len = slots.length * 2 + 1
-    for (const s of slots) {
-      next.push(s)
-      next.push(len - s)
+function buildStandardSlots(size: number): number[] {
+  let slots = [1, 2]
+  let rounds = Math.log2(size)
+  for (let r = 1; r < rounds; r++) {
+    let nextSlots: number[] = []
+    let sum = Math.pow(2, r + 1) + 1
+    for (let i = 0; i < slots.length; i++) {
+        let val = slots[i]
+        if (i % 2 === 0) {
+            nextSlots.push(val, sum - val)
+        } else {
+            nextSlots.push(sum - val, val)
+        }
     }
-    slots = next
+    slots = nextSlots
   }
-  return slots
+  return size === 1 ? [1] : slots
+}
+
+function isValid(
+   player: BracketPlayer, 
+   seed: number, 
+   assignments: Map<number, number>, 
+   standardSlots: number[], 
+   bracketSize: number,
+   firstPlaces: BracketPlayer[],
+   otherPlaces: BracketPlayer[]
+): boolean {
+   if (bracketSize <= 2) return true 
+
+   const idx = standardSlots.indexOf(seed)
+   const half = idx < bracketSize / 2 ? 0 : 1
+
+   let halfCounts = [0, 0]
+   const allPlayers = [...firstPlaces, ...otherPlaces]
+
+   for (const p of allPlayers) {
+       if (p.groupId === player.groupId && assignments.has(p.id)) {
+           const s = assignments.get(p.id)!
+           const i = standardSlots.indexOf(s)
+           halfCounts[i < bracketSize / 2 ? 0 : 1]++
+       }
+   }
+
+   if (half === 0 && halfCounts[0] > halfCounts[1]) return false
+   if (half === 1 && halfCounts[1] > halfCounts[0]) return false
+
+   return true
 }
 
 export { advanceWinner }
