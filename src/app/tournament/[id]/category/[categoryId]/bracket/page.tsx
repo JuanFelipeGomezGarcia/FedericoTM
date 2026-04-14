@@ -223,7 +223,7 @@ export default function BracketPage() {
                 className="rounded-lg border border-border bg-card overflow-hidden shadow-sm"
               >
                 <PlayerRow
-                  name={match.player1_name}
+                  name={match.bye && !match.player1_id ? 'BYE' : match.player1_name}
                   playerId={match.player1_id}
                   winnerId={match.winner_id}
                   canClick={!!canSetWinner}
@@ -236,7 +236,7 @@ export default function BracketPage() {
                 />
                 <div className="border-t border-border/50 mx-2" />
                 <PlayerRow
-                  name={match.bye ? 'BYE' : match.player2_name}
+                  name={match.bye && !match.player2_id ? 'BYE' : match.player2_name}
                   playerId={match.player2_id}
                   winnerId={match.winner_id}
                   canClick={!!canSetWinner && match.bye !== true && match.bye !== 'true'}

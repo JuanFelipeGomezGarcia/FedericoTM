@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < round1Matches; i++) {
       const p1 = slots[i * 2]
       const p2 = slots[i * 2 + 1]
+      
       const isMatchBye = p1 === null || p2 === null
       const nextMatchNumber = hasNextRound ? Math.floor(i / 2) + 1 : null
       await pool.query(
