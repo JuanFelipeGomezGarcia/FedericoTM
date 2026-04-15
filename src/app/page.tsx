@@ -14,14 +14,14 @@ interface Tournament {
 
 // Foundation photos
 const heroImages = [
-  '/assets/f1.jpg',
-  '/assets/f2.jpg',
-  '/assets/f3.jpg',
-  '/assets/f4.jpg',
-  '/assets/f5.jpg',
-  '/assets/f6.jpg',
-  '/assets/f7.jpg',
-  '/assets/f8.jpg'
+  '/assets/player1.png',
+  '/assets/player2.png',
+  '/assets/player3.png',
+  '/assets/player4.png',
+  '/assets/player5.png',
+  '/assets/player6.png',
+  '/assets/player7.png',
+  '/assets/player8.png'
 ]
 
 export default function Home() {
@@ -74,7 +74,7 @@ export default function Home() {
           <div className="animate-marquee gap-3">
             {[...heroImages, ...heroImages].map((src, i) => (
               <div key={`r1-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <Image src={src} alt="bg" fill className="object-cover" unoptimized />
+                <img src={`${src}?v=2`} alt="bg" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
@@ -82,7 +82,7 @@ export default function Home() {
           <div className="animate-marquee-reverse gap-3">
             {[...heroImages, ...heroImages].reverse().map((src, i) => (
               <div key={`r2-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <Image src={src} alt="bg" fill className="object-cover" unoptimized />
+                <img src={`${src}?v=2`} alt="bg" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
@@ -90,7 +90,7 @@ export default function Home() {
           <div className="animate-marquee gap-3">
             {[...heroImages, ...heroImages].map((src, i) => (
               <div key={`r3-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <Image src={src} alt="bg" fill className="object-cover" unoptimized />
+                <img src={`${src}?v=2`} alt="bg" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
@@ -98,7 +98,7 @@ export default function Home() {
           <div className="animate-marquee-reverse gap-3">
             {[...heroImages, ...heroImages].reverse().map((src, i) => (
               <div key={`r4-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <Image src={src} alt="bg" fill className="object-cover" unoptimized />
+                <img src={`${src}?v=2`} alt="bg" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
