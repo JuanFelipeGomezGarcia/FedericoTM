@@ -65,11 +65,26 @@ export default function Home() {
             0% { transform: translateX(-50%); }
             100% { transform: translateX(0%); }
           }
-          .animate-marquee { display: flex; width: max-content; animation: marquee 50s linear infinite; }
-          .animate-marquee-reverse { display: flex; width: max-content; animation: marquee-reverse 50s linear infinite; }
+          .animate-marquee { 
+            display: flex; 
+            width: max-content; 
+            animation: marquee 50s linear infinite;
+            will-change: transform;
+            transform: translateZ(0);
+          }
+          .animate-marquee-reverse { 
+            display: flex; 
+            width: max-content; 
+            animation: marquee-reverse 50s linear infinite;
+            will-change: transform;
+            transform: translateZ(0);
+          }
+          .marquee-container {
+            contain: content;
+          }
         `}} />
 
-        <div className="flex flex-col gap-3 opacity-[0.85] rotate-[-5deg] scale-[1.1] -translate-y-10">
+        <div className="marquee-container flex flex-col gap-3 opacity-[0.85] rotate-[-5deg] scale-[1.1] -translate-y-10">
           {/* Fila 1 */}
           <div className="animate-marquee gap-3">
             {[...heroImages, ...heroImages].map((src, i) => (
