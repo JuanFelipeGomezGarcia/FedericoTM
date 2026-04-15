@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Image from 'next/image'
+import { ArrowLeft } from 'lucide-react'
 
 interface Category {
   id: number
@@ -304,44 +306,49 @@ export default function CategoryPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="page-header">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-5">
-            <div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <Link href="/">
+              <Image 
+                src="/assets/LogoSinFondo.png" 
+                alt="Federico TM Logo" 
+                width={140} 
+                height={40} 
+                className="object-contain" 
+                priority
+              />
+            </Link>
+            <div className="hidden sm:block h-6 w-px bg-border/40" />
+            <div className="flex flex-col">
               <Link
                 href={isAdmin ? `/admin` : `/tournament/${tournamentId}`}
-                className="text-cyan-400 hover:text-cyan-300 text-sm"
+                className="text-muted-foreground hover:text-cyan-400 text-xs transition-colors flex items-center gap-1"
               >
-                {isAdmin ? '← Panel Admin' : '← Volver al Torneo'}
+                <ArrowLeft className="w-3 h-3" />
+                {isAdmin ? 'Panel Admin' : 'Torneo'}
               </Link>
-              <div className="flex items-center gap-3 mt-1">
-                {isAdmin && (
-                  <Link href={`/tournament/${tournamentId}`} className="text-muted-foreground hover:text-foreground text-xs">
-                    ← Torneo
-                  </Link>
-                )}
-                <h1 className="text-2xl font-bold text-foreground">{category.name}</h1>
-              </div>
+              <h1 className="text-lg font-bold text-foreground leading-tight">{category.name}</h1>
             </div>
-            <div className="flex gap-2">
-              {hasElimination && (
-                <Link
-                  href={`/tournament/${tournamentId}/category/${categoryId}/bracket`}
-                  className="btn-secondary"
-                >
-                  🏆 Ver Llaves
-                </Link>
-              )}
-              {isAdmin && !hasElimination && (
-                <button
-                  onClick={handleEliminationButton}
-                  disabled={!allMatchesDone}
-                  title={!allMatchesDone ? 'Completa todos los partidos primero' : 'Generar llaves de eliminación'}
-                  className={allMatchesDone ? 'btn-primary' : 'btn-secondary opacity-40 cursor-not-allowed'}
-                >
-                  🏆 Generar Llaves
-                </button>
-              )}
-            </div>
+          </div>
+          <div className="flex gap-2">
+            {hasElimination && (
+              <Link
+                href={`/tournament/${tournamentId}/category/${categoryId}/bracket`}
+                className="btn-secondary text-xs sm:text-sm py-2 px-4 shadow-lg shadow-cyan-500/5"
+              >
+                🏆 Ver Llaves
+              </Link>
+            )}
+            {isAdmin && !hasElimination && (
+              <button
+                onClick={handleEliminationButton}
+                disabled={!allMatchesDone}
+                title={!allMatchesDone ? 'Completa todos los partidos primero' : 'Generar llaves de eliminación'}
+                className={allMatchesDone ? 'btn-primary text-sm py-2 px-4' : 'btn-secondary opacity-40 cursor-not-allowed text-sm py-2 px-4'}
+              >
+                🏆 Generar Llaves
+              </button>
+            )}
           </div>
         </div>
       </header>

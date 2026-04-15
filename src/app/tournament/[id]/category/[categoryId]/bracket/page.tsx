@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface Match {
   id: number
@@ -136,13 +137,30 @@ export default function BracketPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="page-header">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
-          <Link href={`/tournament/${tournamentId}/category/${categoryId}`} className="text-cyan-400 hover:text-cyan-300 text-sm">
-            ← Volver
-          </Link>
-          <h1 className="text-xl font-bold text-foreground">Llaves de Eliminación</h1>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <Link href="/">
+              <Image 
+                src="/assets/LogoSinFondo.png" 
+                alt="Federico TM Logo" 
+                width={130} 
+                height={35} 
+                className="object-contain" 
+                priority
+              />
+            </Link>
+            <div className="h-4 w-px bg-border/40" />
+            <div className="flex items-center gap-3">
+              <Link href={`/tournament/${tournamentId}/category/${categoryId}`} className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors">
+                ← Volver
+              </Link>
+              <h1 className="text-base font-bold text-foreground">Llaves de Eliminación</h1>
+            </div>
+          </div>
           {isAdmin && (
-            <span className="text-xs text-muted-foreground">· Haz clic en un jugador para marcarlo ganador</span>
+            <span className="hidden md:inline text-[10px] uppercase tracking-widest text-muted-foreground/60 font-bold bg-white/5 px-3 py-1 rounded-full border border-white/5">
+              Modo Admin · Click para marcador
+            </span>
           )}
         </div>
       </header>

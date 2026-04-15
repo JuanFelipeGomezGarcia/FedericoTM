@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Trophy, LogOut, Shield, Eye, EyeOff, LayoutDashboard, Home } from 'lucide-react'
 
 interface AdminLayoutProps {
@@ -75,10 +76,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className="w-full max-w-md relative animate-fade-in">
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 shadow-2xl shadow-cyan-500/30 mb-4">
-              <Trophy className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center mb-4">
+              <Image 
+                src="/assets/LogoSinFondo.png" 
+                alt="Federico TM Logo" 
+                width={220} 
+                height={60} 
+                className="object-contain" 
+                priority
+              />
             </div>
-            <h1 className="text-2xl font-bold text-foreground">Federico TM</h1>
             <p className="text-muted-foreground text-sm mt-1">Panel de Administración</p>
           </div>
 
@@ -160,10 +167,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-                <Trophy className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-bold text-foreground">Federico TM</span>
+              <Image 
+                src="/assets/LogoSinFondo.png" 
+                alt="Federico TM Logo" 
+                width={130} 
+                height={35} 
+                className="object-contain" 
+                priority
+              />
             </div>
             <div className="hidden sm:flex items-center gap-1 ml-4">
               <Link href="/admin" className={pathname === '/admin' ? 'nav-link-active' : 'nav-link'}>

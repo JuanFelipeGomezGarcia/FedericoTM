@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   title: 'Federico TM — Torneos de Tenis de Mesa',
   description: 'Plataforma de gestión de torneos de tenis de mesa con round robin y eliminación directa.',
   icons: {
-    icon: '/5140583.png',
+    icon: '/assets/LogoTM.png',
   },
 }
 

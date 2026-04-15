@@ -1,1 +1,15 @@
-{}
+{
+  "/page": "app/page.js",
+  "/tournament/[id]/page": "app/tournament/[id]/page.js",
+  "/api/tournaments/route": "app/api/tournaments/route.js",
+  "/admin/page": "app/admin/page.js",
+  "/tournament/[id]/category/[categoryId]/page": "app/tournament/[id]/category/[categoryId]/page.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/tournaments/[id]/route": "app/api/tournaments/[id]/route.js",
+  "/api/groups/route": "app/api/groups/route.js",
+  "/api/categories/route": "app/api/categories/route.js",
+  "/api/round-robin-matches/route": "app/api/round-robin-matches/route.js",
+  "/api/elimination-matches/route": "app/api/elimination-matches/route.js",
+  "/api/standings/route": "app/api/standings/route.js",
+  "/api/categories/[id]/route": "app/api/categories/[id]/route.js"
+}

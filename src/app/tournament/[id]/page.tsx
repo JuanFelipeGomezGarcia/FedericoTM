@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Trophy, Calendar, ChevronRight, ArrowLeft, Layers, Users, Award, Clock } from 'lucide-react'
 
 interface Tournament {
@@ -74,10 +75,14 @@ export default function TournamentPage() {
       <header className="page-header">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-              <Trophy className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-foreground">Federico TM</span>
+            <Image 
+              src="/assets/LogoSinFondo.png" 
+              alt="Federico TM Logo" 
+              width={140} 
+              height={40} 
+              className="object-contain" 
+              priority
+            />
           </div>
           <Link href={isAdmin ? '/admin' : '/'} className="btn-secondary py-1.5 px-3 text-xs">
             <ArrowLeft className="w-3.5 h-3.5" />
