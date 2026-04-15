@@ -14,14 +14,14 @@ interface Tournament {
 
 // Foundation photos
 const heroImages = [
-  '/assets/player1.png',
-  '/assets/player2.png',
-  '/assets/player3.png',
-  '/assets/player4.png',
-  '/assets/player5.png',
-  '/assets/player6.png',
-  '/assets/player7.png',
-  '/assets/player8.png'
+  '/hero1.jpg',
+  '/hero2.jpg',
+  '/hero3.jpg',
+  '/hero4.jpg',
+  '/hero5.jpg',
+  '/hero6.jpg',
+  '/hero7.jpg',
+  '/hero8.jpg'
 ]
 
 export default function Home() {
@@ -73,34 +73,35 @@ export default function Home() {
           {/* Fila 1 */}
           <div className="animate-marquee gap-3">
             {[...heroImages, ...heroImages].map((src, i) => (
-              <div key={`r1-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <img src={`${src}?v=2`} alt="bg" className="w-full h-full object-cover" />
+              <div key={`r1-${i}`} className="relative w-[280px] h-[180px] sm:w-[300px] sm:h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
+                <img src={`${src}?v=3`} alt="bg" className="w-full h-full object-cover" decoding="async" />
               </div>
             ))}
           </div>
           {/* Fila 2 */}
           <div className="animate-marquee-reverse gap-3">
             {[...heroImages, ...heroImages].reverse().map((src, i) => (
-              <div key={`r2-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <img src={`${src}?v=2`} alt="bg" className="w-full h-full object-cover" />
+              <div key={`r2-${i}`} className="relative w-[280px] h-[180px] sm:w-[300px] sm:h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
+                <img src={`${src}?v=3`} alt="bg" className="w-full h-full object-cover" decoding="async" />
               </div>
             ))}
           </div>
-          {/* Fila 3 */}
-          <div className="animate-marquee gap-3">
-            {[...heroImages, ...heroImages].map((src, i) => (
-              <div key={`r3-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <img src={`${src}?v=2`} alt="bg" className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </div>
-          {/* Fila 4 */}
-          <div className="animate-marquee-reverse gap-3">
-            {[...heroImages, ...heroImages].reverse().map((src, i) => (
-              <div key={`r4-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <img src={`${src}?v=2`} alt="bg" className="w-full h-full object-cover" />
-              </div>
-            ))}
+          {/* Fila 3 y 4 (Solo escritorio para ahorrar memoria en móvil) */}
+          <div className="hidden lg:flex lg:flex-col lg:gap-3">
+            <div className="animate-marquee gap-3">
+              {[...heroImages, ...heroImages].map((src, i) => (
+                <div key={`r3-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
+                  <img src={`${src}?v=3`} alt="bg" className="w-full h-full object-cover" decoding="async" />
+                </div>
+              ))}
+            </div>
+            <div className="animate-marquee-reverse gap-3">
+              {[...heroImages, ...heroImages].reverse().map((src, i) => (
+                <div key={`r4-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
+                  <img src={`${src}?v=3`} alt="bg" className="w-full h-full object-cover" decoding="async" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
