@@ -74,7 +74,7 @@ export default function Home() {
           <div className="animate-marquee gap-3">
             {[...heroImages, ...heroImages].map((src, i) => (
               <div key={`r1-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <Image src={src} alt="bg" fill className="object-cover" />
+                <img src={src} alt="bg" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
@@ -82,7 +82,7 @@ export default function Home() {
           <div className="animate-marquee-reverse gap-3">
             {[...heroImages, ...heroImages].reverse().map((src, i) => (
               <div key={`r2-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <Image src={src} alt="bg" fill className="object-cover" />
+                <img src={src} alt="bg" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
@@ -90,15 +90,15 @@ export default function Home() {
           <div className="animate-marquee gap-3">
             {[...heroImages, ...heroImages].map((src, i) => (
               <div key={`r3-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <Image src={src} alt="bg" fill className="object-cover" />
+                <img src={src} alt="bg" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
-          {/* Fila 4 para pantallas muy ultra anchas por si acaso */}
+          {/* Fila 4 */}
           <div className="animate-marquee-reverse gap-3">
             {[...heroImages, ...heroImages].reverse().map((src, i) => (
               <div key={`r4-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                <Image src={src} alt="bg" fill className="object-cover" />
+                <img src={src} alt="bg" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
@@ -171,8 +171,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right Side: Logo TM 3D */}
-            <div className="lg:col-span-5 relative group mt-10 lg:mt-0 flex justify-center items-center">
+            {/* Right Side: Logo TM 3D (Hidden on mobile) */}
+            <div className="hidden lg:flex lg:col-span-5 relative group mt-10 lg:mt-0 justify-center items-center">
               <div className="relative w-full max-w-[320px] aspect-square rounded-2xl overflow-visible transition-all duration-500 ease-out transform group-hover:-translate-y-4 group-hover:scale-105 z-20 flex justify-center items-center">
                 <Image
                   src="/assets/LogoTM.png"
