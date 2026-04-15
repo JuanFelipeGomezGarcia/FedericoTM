@@ -86,22 +86,21 @@ export default function Home() {
               </div>
             ))}
           </div>
-          {/* Fila 3 y 4 (Solo escritorio para ahorrar memoria en móvil) */}
-          <div className="hidden lg:flex lg:flex-col lg:gap-3">
-            <div className="animate-marquee gap-3">
-              {[...heroImages, ...heroImages].map((src, i) => (
-                <div key={`r3-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                  <img src={`${src}?v=3`} alt="bg" className="w-full h-full object-cover" decoding="async" />
-                </div>
-              ))}
-            </div>
-            <div className="animate-marquee-reverse gap-3">
-              {[...heroImages, ...heroImages].reverse().map((src, i) => (
-                <div key={`r4-${i}`} className="relative w-[300px] h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                  <img src={`${src}?v=3`} alt="bg" className="w-full h-full object-cover" decoding="async" />
-                </div>
-              ))}
-            </div>
+          {/* Fila 3 */}
+          <div className="animate-marquee gap-3">
+            {[...heroImages, ...heroImages].map((src, i) => (
+              <div key={`r3-${i}`} className="relative w-[280px] h-[180px] sm:w-[300px] sm:h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
+                <img src={`${src}?v=3`} alt="bg" className="w-full h-full object-cover" decoding="async" />
+              </div>
+            ))}
+          </div>
+          {/* Fila 4 */}
+          <div className="animate-marquee-reverse gap-3">
+            {[...heroImages, ...heroImages].reverse().map((src, i) => (
+              <div key={`r4-${i}`} className="relative w-[280px] h-[180px] sm:w-[300px] sm:h-[200px] rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
+                <img src={`${src}?v=3`} alt="bg" className="w-full h-full object-cover" decoding="async" />
+              </div>
+            ))}
           </div>
         </div>
 
