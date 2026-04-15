@@ -1,6 +1,6 @@
 {
-  "/page": "app/page.js",
   "/tournament/[id]/page": "app/tournament/[id]/page.js",
-  "/tournament/[id]/category/[categoryId]/page": "app/tournament/[id]/category/[categoryId]/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/page": "app/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/tournament/[id]/category/[categoryId]/page": "app/tournament/[id]/category/[categoryId]/page.js"
 }
