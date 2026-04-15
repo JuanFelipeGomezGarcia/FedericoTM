@@ -16,15 +16,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/tournament/[id]/page.js"
     ],
-    "/admin/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/page.js"
-    ],
     "/tournament/[id]/category/[categoryId]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/tournament/[id]/category/[categoryId]/page.js"
+    ],
+    "/tournament/[id]/category/[categoryId]/bracket/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/tournament/[id]/category/[categoryId]/bracket/page.js"
+    ],
+    "/admin/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/page.js"
     ]
   }
 }

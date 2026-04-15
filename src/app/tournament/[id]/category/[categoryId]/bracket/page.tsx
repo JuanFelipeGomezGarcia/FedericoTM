@@ -1,9 +1,20 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { Trophy, Medal, Star, Award, Crown, ArrowDown, ArrowLeft, GripVertical, UserPlus } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  useDraggable,
+  useDroppable,
+} from '@dnd-kit/core'
 
 interface Match {
   id: number
@@ -17,12 +28,28 @@ interface Match {
   bye: boolean
 }
 
+interface RankedPlayer {
+  id: number
+  name: string
+  rank: number
+  source: 'elimination' | 'round-robin'
+  stats?: {
+    groupPos: number
+    wins: number
+    setDiff: number
+    setsWon: number
+    groupWinnerRank?: number
+  }
+}
+
 // Dimensiones
 const CARD_W = 220
-const CARD_H = 64       // altura total de la card (2 jugadores)
-const PLAYER_H = 32     // altura de cada fila de jugador
-const COL_GAP = 56      // espacio horizontal entre columnas
-const PADDING = 24      // padding top/left del canvas
+const CARD_H = 64
+const PLAYER_H = 32
+const COL_GAP = 56
+const PADDING = 24
+const LABEL_H = 28
+const BASE_GAP = 20
 
 export default function BracketPage() {
   const params = useParams()
@@ -33,34 +60,238 @@ export default function BracketPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [saving, setSaving] = useState<number | null>(null)
   const [confirmingSlot, setConfirmingSlot] = useState<string | null>(null)
+  const [standings, setStandings] = useState<any[]>([])
+  const [showRanking, setShowRanking] = useState(false)
+  const [swapping, setSwapping] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newPlayerName, setNewPlayerName] = useState('')
 
-  useEffect(() => { setIsAdmin(!!localStorage.getItem('admin-token')) }, [])
+  // DnD Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  )
 
-  const fetchMatches = useCallback(async () => {
-    const res = await fetch(`/api/elimination-matches?categoryId=${categoryId}`)
-    if (res.ok) setMatches(await res.json())
+  useEffect(() => { 
+    setIsAdmin(!!localStorage.getItem('admin-token')) 
+  }, [])
+
+  const fetchStandings = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/standings?categoryId=${categoryId}`)
+      if (res.ok) setStandings(await res.json())
+    } catch (e) { console.error(e) }
   }, [categoryId])
 
-  useEffect(() => { fetchMatches() }, [fetchMatches])
+  const fetchMatches = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/elimination-matches?categoryId=${categoryId}`)
+      if (res.ok) setMatches(await res.json())
+    } catch (e) { console.error(e) }
+  }, [categoryId])
+
+  useEffect(() => { 
+    fetchMatches() 
+  }, [fetchMatches])
 
   const setWinner = async (matchId: number, winnerId: number) => {
     setConfirmingSlot(null)
     setSaving(matchId)
     const token = localStorage.getItem('admin-token')
-    const res = await fetch('/api/elimination-matches', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify({ id: matchId, winner_id: winnerId })
-    })
-    setSaving(null)
-    if (res.ok) {
-      const updated = await res.json()
-      setMatches(updated) // actualizar estado directamente con la respuesta
+    try {
+      const res = await fetch('/api/elimination-matches', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ id: matchId, winner_id: winnerId })
+      })
+      setSaving(null)
+      if (res.ok) setMatches(await res.json())
+    } catch (e) { 
+      setSaving(null)
+      console.error(e) 
     }
   }
+
+  // Bracket dimensions and calculations
+  const rounds = useMemo(() => Array.from(new Set(matches.map(m => m.round))).sort((a, b) => a - b), [matches])
+  const totalRounds = rounds.length
+  const finalMatch = useMemo(() => matches.find(m => m.round === totalRounds && m.match_number === 1), [matches, totalRounds])
+  const isFinished = !!finalMatch?.winner_id
+
+  // Dragging logic
+  const someWinnerExists = useMemo(() => matches.some(m => !m.bye && !!m.winner_id), [matches])
+  const canDrag = isAdmin && !someWinnerExists
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setSwapping(true)
+    const [matchAId, slotA] = (active.id as string).split('-')
+    const [matchBId, slotB] = (over.id as string).split('-')
+
+    try {
+      const res = await fetch('/api/elimination-matches/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchAId, slotA, matchBId, slotB })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setMatches(data)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSwapping(false)
+    }
+  }
+
+  const addPlayer = async () => {
+    if (!newPlayerName.trim()) return
+
+    setSwapping(true)
+    setShowAddModal(false)
+    try {
+      const res = await fetch('/api/elimination-matches/add-player', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryId, playerName: newPlayerName })
+      })
+      if (res.ok) {
+        setMatches(await res.json())
+        setNewPlayerName('')
+      } else {
+        const err = await res.json()
+        alert(err.error || 'Error al agregar jugador')
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSwapping(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isFinished) {
+      fetchStandings()
+      setShowRanking(true)
+    }
+  }, [isFinished, fetchStandings])
+
+  const finalRanking = useMemo((): RankedPlayer[] => {
+    if (!isFinished || matches.length === 0) return []
+
+    const ranking: Record<number, RankedPlayer> = {}
+
+    if (finalMatch?.winner_id) {
+      const winnerId = finalMatch.winner_id
+      const winnerName = winnerId === finalMatch.player1_id ? finalMatch.player1_name : finalMatch.player2_name
+      const loserId = winnerId === finalMatch.player1_id ? finalMatch.player2_id : finalMatch.player1_id
+      const loserName = winnerId === finalMatch.player1_id ? finalMatch.player2_name : finalMatch.player1_name
+
+      ranking[1] = { id: winnerId, name: winnerName || '?', rank: 1, source: 'elimination' }
+      if (loserId) {
+        ranking[2] = { id: loserId, name: loserName || '?', rank: 2, source: 'elimination' }
+      }
+
+      for (let r = totalRounds - 1; r >= 1; r--) {
+        const roundMatches = matches.filter(m => m.round === r)
+        roundMatches.forEach(m => {
+          if (!m.winner_id || m.bye) return
+          const winnerRank = Object.values(ranking).find(rp => rp.id === m.winner_id)?.rank
+          if (winnerRank) {
+            const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id
+            const loserName = m.winner_id === m.player1_id ? m.player2_name : m.player1_name
+            if (loserId && !Object.values(ranking).some(rp => rp.id === loserId)) {
+              const loserRank = winnerRank + Math.pow(2, totalRounds - r)
+              ranking[loserRank] = { id: loserId, name: loserName || '?', rank: loserRank, source: 'elimination' }
+            }
+          }
+        })
+      }
+    }
+
+    const eliminationRanked = Object.values(ranking).sort((a, b) => a.rank - b.rank)
+    const eliminationIds = new Set(eliminationRanked.map(p => p.id))
+    const playerToRankMap = new Map<number, number>()
+    eliminationRanked.forEach(p => playerToRankMap.set(p.id, p.rank))
+
+    const groupWinnerRankMap = new Map<number, number>()
+    standings.forEach(group => {
+      const winner = group.standings[0]
+      if (winner) {
+        const rank = playerToRankMap.get(winner.id) || 999
+        groupWinnerRankMap.set(group.groupId, rank)
+      }
+    })
+
+    const rrPlayers: RankedPlayer[] = []
+    standings.forEach(group => {
+      group.standings.forEach((s: any, idx: number) => {
+        if (!eliminationIds.has(s.id)) {
+          rrPlayers.push({
+            id: s.id,
+            name: s.name,
+            rank: 999,
+            source: 'round-robin',
+            stats: {
+              groupPos: idx + 1,
+              wins: s.wins,
+              setDiff: s.setDiff,
+              setsWon: s.setsWon,
+              groupWinnerRank: groupWinnerRankMap.get(group.groupId) || 999
+            }
+          })
+        }
+      })
+    })
+
+    rrPlayers.sort((a, b) => {
+      const sA = a.stats!
+      const sB = b.stats!
+      if (sA.groupPos !== sB.groupPos) return sA.groupPos - sB.groupPos
+      if (sA.groupWinnerRank !== sB.groupWinnerRank) return (sA.groupWinnerRank || 999) - (sB.groupWinnerRank || 999)
+      if (sB.wins !== sA.wins) return sB.wins - sA.wins
+      return sB.setDiff - sA.setDiff
+    })
+
+    let nextRank = eliminationRanked.length > 0 ? Math.max(...eliminationRanked.map(r => r.rank)) + 1 : 1
+    const finalRankingResult = [...eliminationRanked]
+    rrPlayers.forEach(p => {
+      finalRankingResult.push({ ...p, rank: nextRank++ })
+    })
+
+    return finalRankingResult
+  }, [isFinished, matches, finalMatch, totalRounds, standings])
+
+  const matchY = useMemo(() => {
+    const result: Record<number, Record<number, number>> = {}
+    if (matches.length === 0) return result
+    const r1 = matches.filter(m => m.round === 1).sort((a, b) => a.match_number - b.match_number)
+    result[1] = {}
+    r1.forEach((m, i) => {
+      result[1][m.match_number] = PADDING + LABEL_H + i * (CARD_H + BASE_GAP)
+    })
+    for (let r = 2; r <= totalRounds; r++) {
+      result[r] = {}
+      const rMatches = matches.filter(m => m.round === r).sort((a, b) => a.match_number - b.match_number)
+      rMatches.forEach(m => {
+        const c1 = result[r - 1]?.[m.match_number * 2 - 1]
+        const c2 = result[r - 1]?.[m.match_number * 2]
+        if (c1 !== undefined && c2 !== undefined) {
+          result[r][m.match_number] = (c1 + c2) / 2
+        } else if (c1 !== undefined) {
+          result[r][m.match_number] = c1
+        }
+      })
+    }
+    return result
+  }, [matches, totalRounds])
 
   if (matches.length === 0) {
     return (
@@ -75,213 +306,327 @@ export default function BracketPage() {
     )
   }
 
-  const rounds = Array.from(new Set(matches.map(m => m.round))).sort((a, b) => a - b)
-  const totalRounds = rounds.length
-  
-  const finalMatch = matches.find(m => m.round === totalRounds && m.match_number === 1)
-  const isFinished = !!finalMatch?.winner_id
-
+  const canvasW = PADDING + totalRounds * (CARD_W + COL_GAP) - COL_GAP + PADDING;
+  const allYs = Object.values(matchY).flatMap(r => Object.values(r));
+  const canvasH = allYs.length > 0 ? Math.max(...allYs) + CARD_H + PADDING : 600;
+  const colX = (round: number) => PADDING + (round - 1) * (CARD_W + COL_GAP);
   const roundLabel = (round: number) => {
-    const fromEnd = totalRounds - round
-    if (fromEnd === 0) return 'Final'
-    if (fromEnd === 1) return 'Semifinal'
-    if (fromEnd === 2) return 'Cuartos'
-    return `Ronda ${round}`
-  }
-
-  // ── Calcular posición Y de cada partido ──────────────────────────────────
-  // En ronda 1 los partidos se apilan con un gap entre ellos.
-  // El gap entre partidos se duplica en cada ronda siguiente.
-  // Cada partido de ronda N se centra entre sus dos hijos de ronda N-1.
-
-  const LABEL_H = 28  // altura reservada para la etiqueta de ronda
-
-  // Gap entre cards en ronda 1
-  const BASE_GAP = 20
-
-  // Posición Y del centro de cada card por ronda
-  // matchY[round][matchNumber] = top Y de la card
-  const matchY: Record<number, Record<number, number>> = {}
-
-  // Ronda 1
-  const r1Matches = matches.filter(m => m.round === 1).sort((a, b) => a.match_number - b.match_number)
-  matchY[1] = {}
-  r1Matches.forEach((m, i) => {
-    matchY[1][m.match_number] = PADDING + LABEL_H + i * (CARD_H + BASE_GAP)
-  })
-
-  // Rondas siguientes
-  for (let r = 2; r <= totalRounds; r++) {
-    matchY[r] = {}
-    const rMatches = matches.filter(m => m.round === r).sort((a, b) => a.match_number - b.match_number)
-    rMatches.forEach(m => {
-      const c1 = matchY[r - 1]?.[m.match_number * 2 - 1]
-      const c2 = matchY[r - 1]?.[m.match_number * 2]
-      if (c1 !== undefined && c2 !== undefined) {
-        // centrar entre los dos hijos
-        matchY[r][m.match_number] = (c1 + c2) / 2 + (CARD_H / 2) - CARD_H / 2
-      } else if (c1 !== undefined) {
-        matchY[r][m.match_number] = c1
-      }
-    })
-  }
-
-  // Dimensiones totales del canvas
-  const canvasW = PADDING + totalRounds * (CARD_W + COL_GAP) - COL_GAP + PADDING
-  const allYs = Object.values(matchY).flatMap(r => Object.values(r))
-  const canvasH = Math.max(...allYs) + CARD_H + PADDING
-
-  // X de cada columna
-  const colX = (round: number) => PADDING + (round - 1) * (CARD_W + COL_GAP)
+    const fromEnd = totalRounds - round;
+    if (fromEnd === 0) return 'Final';
+    if (fromEnd === 1) return 'Semifinal';
+    if (fromEnd === 2) return 'Cuartos';
+    return `Ronda ${round}`;
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="page-header">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link href="/">
-              <Image 
-                src="/assets/LogoSinFondo.png" 
-                alt="Federico TM Logo" 
-                width={130} 
-                height={35} 
-                className="object-contain" 
-                priority
-              />
-            </Link>
-            <div className="h-4 w-px bg-border/40" />
-            <div className="flex items-center gap-3">
-              <Link href={`/tournament/${tournamentId}/category/${categoryId}`} className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors">
-                ← Volver
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <div className="min-h-screen bg-background">
+        <header className="page-header">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Link href="/">
+                <Image src="/assets/LogoSinFondo.png" alt="Logo" width={130} height={35} className="object-contain" priority />
               </Link>
-              <h1 className="text-base font-bold text-foreground">Llaves de Eliminación</h1>
+              <div className="h-4 w-px bg-border/40" />
+              <div className="flex items-center gap-3">
+                <Link href={`/tournament/${tournamentId}/category/${categoryId}`} className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors">
+                  <ArrowLeft className="w-4 h-4 inline mr-1" /> Volver
+                </Link>
+                <h1 className="text-base font-bold text-foreground">Llaves de Eliminación</h1>
+              </div>
+            </div>
+            {isAdmin && (
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-end">
+                  <span className="hidden md:inline text-[10px] uppercase tracking-widest text-muted-foreground/60 font-bold bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                    Modo Admin
+                  </span>
+                  {canDrag && (
+                    <span className="text-[9px] text-cyan-400/60 uppercase tracking-tighter mt-1 italic">
+                      Arrastra para reordenar
+                    </span>
+                  )}
+                </div>
+                {canDrag && (
+                  <button 
+                    onClick={() => setShowAddModal(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition-all shadow-lg shadow-cyan-500/5 group"
+                    title="Agregar Jugador Manual"
+                  >
+                    <UserPlus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    <span className="hidden sm:inline">Agregar</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* Modal para Agregar Jugador */}
+        {showAddModal && (
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center px-4 bg-background/80 backdrop-blur-sm animate-fade-in">
+            <div className="w-full max-w-md glass-card p-8 border-cyan-500/30 animate-scale-in">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                  <UserPlus className="w-6 h-6 text-cyan-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">Agregar Participante</h3>
+                  <p className="text-xs text-muted-foreground">El cuadro se expandirá automáticamente si es necesario.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold ml-1">Nombre Completo</label>
+                  <input 
+                    autoFocus
+                    type="text" 
+                    value={newPlayerName}
+                    onChange={(e) => setNewPlayerName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addPlayer()}
+                    className="w-full bg-secondary/50 border border-border focus:border-cyan-500/50 outline-none rounded-xl px-4 py-3 text-foreground transition-all"
+                    placeholder="Ej: Juan Pérez"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    onClick={() => { setShowAddModal(false); setNewPlayerName(''); }}
+                    className="flex-1 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/70 text-foreground font-medium transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={addPlayer}
+                    disabled={!newPlayerName.trim()}
+                    className="flex-1 px-4 py-3 rounded-xl bg-cyan-500 text-slate-900 font-bold hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-          {isAdmin && (
-            <span className="hidden md:inline text-[10px] uppercase tracking-widest text-muted-foreground/60 font-bold bg-white/5 px-3 py-1 rounded-full border border-white/5">
-              Modo Admin · Click para marcador
-            </span>
-          )}
-        </div>
-      </header>
+        )}
 
-      <main className="py-8 px-4 overflow-auto">
-        <div style={{ position: 'relative', width: canvasW, height: canvasH }}>
-
-          {/* ── Etiquetas de ronda ── */}
-          {rounds.map(round => (
-            <div
-              key={`lbl-${round}`}
-              style={{ position: 'absolute', top: PADDING, left: colX(round), width: CARD_W }}
-              className="text-center text-xs font-semibold text-cyan-400 uppercase tracking-wider"
-            >
-              {roundLabel(round)}
-            </div>
-          ))}
-
-          {/* ── SVG líneas conectoras ── */}
-          <svg
-            style={{ position: 'absolute', top: 0, left: 0, width: canvasW, height: canvasH, overflow: 'visible' }}
-            className="pointer-events-none"
-          >
-            {rounds.slice(0, -1).map(round => {
-              const nextRound = round + 1
-              const nextMatches = matches.filter(m => m.round === nextRound)
-
-              return nextMatches.map(parent => {
-                const c1Num = parent.match_number * 2 - 1
-                const c2Num = parent.match_number * 2
-                const y1 = matchY[round]?.[c1Num]
-                const y2 = matchY[round]?.[c2Num]
-                const yP = matchY[nextRound]?.[parent.match_number]
-
-                if (y1 === undefined || y2 === undefined || yP === undefined) return null
-
-                // Puntos de conexión:
-                // - Sale del borde derecho de cada card hijo, a la altura del centro de la card
-                // - Línea vertical que une los dos hijos
-                // - Línea horizontal que va al borde izquierdo del partido padre
-
-                const xRight = colX(round) + CARD_W          // borde derecho de los hijos
-                const xLeft  = colX(nextRound)                // borde izquierdo del padre
-                const xMid   = xRight + COL_GAP / 2           // punto medio horizontal
-
-                const cy1 = y1 + CARD_H / 2   // centro vertical hijo 1
-                const cy2 = y2 + CARD_H / 2   // centro vertical hijo 2
-                const cyP = yP + CARD_H / 2   // centro vertical padre
-
-                return (
-                  <g key={`conn-${round}-${parent.match_number}`}>
-                    {/* Línea horizontal desde hijo 1 hasta xMid */}
-                    <line x1={xRight} y1={cy1} x2={xMid} y2={cy1} stroke="hsl(var(--border))" strokeWidth="1.5" />
-                    {/* Línea horizontal desde hijo 2 hasta xMid */}
-                    <line x1={xRight} y1={cy2} x2={xMid} y2={cy2} stroke="hsl(var(--border))" strokeWidth="1.5" />
-                    {/* Línea vertical que une los dos en xMid */}
-                    <line x1={xMid} y1={cy1} x2={xMid} y2={cy2} stroke="hsl(var(--border))" strokeWidth="1.5" />
-                    {/* Línea horizontal desde xMid hasta el padre */}
-                    <line x1={xMid} y1={cyP} x2={xLeft} y2={cyP} stroke="hsl(var(--border))" strokeWidth="1.5" />
-                  </g>
-                )
-              })
-            })}
-          </svg>
-
-          {/* ── Cards de partidos ── */}
-          {matches.map(match => {
-            const x = colX(match.round)
-            const y = matchY[match.round]?.[match.match_number] ?? 0
-            
-            const nextMatch = matches.find(m => m.round === match.round + 1 && m.match_number === Math.ceil(match.match_number / 2))
-            const canSetWinner = isAdmin && !isFinished && !match.bye && !!match.player1_id && !!match.player2_id && (!nextMatch || !nextMatch.winner_id)
-
-            return (
-              <div
-                key={match.id}
-                style={{ position: 'absolute', left: x, top: y, width: CARD_W, height: CARD_H }}
-                className="rounded-lg border border-border bg-card overflow-hidden shadow-sm"
-              >
-                <PlayerRow
-                  name={match.bye && !match.player1_id ? 'BYE' : match.player1_name}
-                  playerId={match.player1_id}
-                  winnerId={match.winner_id}
-                  canClick={!!canSetWinner}
-                  saving={saving === match.id}
-                  onClick={() => match.player1_id && setWinner(match.id, match.player1_id)}
-                  position={match.round === 1 ? match.match_number * 2 - 1 : undefined}
-                  isConfirming={confirmingSlot === `${match.id}-${match.player1_id}`}
-                  onStartConfirm={() => match.player1_id && setConfirmingSlot(`${match.id}-${match.player1_id}`)}
-                  onCancelConfirm={() => setConfirmingSlot(null)}
-                />
-                <div className="border-t border-border/50 mx-2" />
-                <PlayerRow
-                  name={match.bye && !match.player2_id ? 'BYE' : match.player2_name}
-                  playerId={match.player2_id}
-                  winnerId={match.winner_id}
-                  canClick={!!canSetWinner && match.bye !== true && match.bye !== 'true'}
-                  saving={saving === match.id}
-                  onClick={() => match.player2_id && setWinner(match.id, match.player2_id)}
-                  position={match.round === 1 ? match.match_number * 2 : undefined}
-                  isConfirming={confirmingSlot === `${match.id}-${match.player2_id}`}
-                  onStartConfirm={() => match.player2_id && setConfirmingSlot(`${match.id}-${match.player2_id}`)}
-                  onCancelConfirm={() => setConfirmingSlot(null)}
-                />
+        <main className={cn("py-8 px-4 overflow-auto transition-opacity", swapping && "opacity-50 pointer-events-none")}>
+          {isFinished && showRanking && finalRanking.length > 0 && (
+            <div className="max-w-5xl mx-auto mb-16 animate-fade-in text-center">
+              <div className="flex flex-col items-center mb-10">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm font-bold mb-4">
+                  <Trophy className="w-4 h-4" /> RANKING FINAL
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-black gradient-text uppercase tracking-tight">Cuadro de Honor</h2>
               </div>
-            )
-          })}
+              
+              <div className="relative px-4 pb-12">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end max-w-4xl mx-auto">
+                  <div className="order-2 md:order-1 flex flex-col items-center group stagger-1 animate-slide-in">
+                    <div className="relative w-full glass-card p-6 flex flex-col items-center border-slate-400/30 bg-slate-400/5 hover:bg-slate-400/10 transition-all duration-300">
+                      <div className="absolute -top-4 bg-slate-400 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-bold shadow-lg">2</div>
+                      <Medal className="w-10 h-10 text-slate-400 mb-3" />
+                      <span className="text-lg font-bold text-foreground text-center line-clamp-1">{finalRanking[1]?.name}</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-widest mt-1">Subcampeón</span>
+                    </div>
+                    <div className="w-full h-12 bg-gradient-to-t from-slate-400/20 to-transparent mt-2 rounded-b-xl" />
+                  </div>
 
-        </div>
-      </main>
-    </div>
-  )
+                  <div className="order-1 md:order-2 flex flex-col items-center group animate-slide-in">
+                    <div className="relative w-full glass-card p-8 flex flex-col items-center border-yellow-500/50 bg-yellow-500/5 hover:bg-yellow-500/10 transition-all duration-300 shadow-xl shadow-yellow-500/10" style={{ transform: 'translateY(-15%)' }}>
+                      <div className="absolute -top-6 bg-yellow-500 text-yellow-950 w-12 h-12 rounded-full flex items-center justify-center font-bold shadow-xl border-4 border-background text-xl">1</div>
+                      <Crown className="w-14 h-14 text-yellow-500 mb-4 animate-bounce" />
+                      <span className="text-2xl font-black text-foreground text-center line-clamp-1">{finalRanking[0]?.name}</span>
+                      <span className="text-sm text-yellow-500 font-bold uppercase tracking-widest mt-1">Campeón</span>
+                    </div>
+                    <div className="w-full h-20 bg-gradient-to-t from-yellow-500/30 to-transparent mt-2 rounded-b-xl" />
+                  </div>
+
+                  <div className="order-3 md:order-3 flex flex-col items-center group stagger-2 animate-slide-in">
+                    <div className="relative w-full glass-card p-6 flex flex-col items-center border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-all duration-300">
+                      <div className="absolute -top-4 bg-amber-500 text-amber-950 w-8 h-8 rounded-full flex items-center justify-center font-bold shadow-lg">3</div>
+                      <Award className="w-10 h-10 text-amber-500 mb-3" />
+                      <div className="flex items-center justify-center gap-1.5 w-full flex-wrap">
+                        <span className="text-sm font-bold text-foreground">{finalRanking[2]?.name}</span>
+                        <span className="text-muted-foreground">-</span>
+                        <span className="text-sm font-bold text-foreground">{finalRanking[3]?.name}</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-2">Terceros Puestos</span>
+                    </div>
+                    <div className="w-full h-8 bg-gradient-to-t from-amber-500/20 to-transparent mt-2 rounded-b-xl" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card overflow-hidden border-border/50 max-w-4xl mx-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-secondary/50">
+                      <th className="px-6 py-4 text-left font-bold text-muted-foreground uppercase tracking-wider w-20">#</th>
+                      <th className="px-6 py-4 text-left font-bold text-muted-foreground uppercase tracking-wider">Participante</th>
+                      <th className="px-6 py-4 text-center font-bold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Etapa</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {finalRanking.map((player) => (
+                      <tr key={player.id} className={cn(
+                        "hover:bg-white/5 transition-colors group",
+                        player.rank <= 1 ? "bg-yellow-500/5" : player.rank === 2 ? "bg-slate-500/5" : (player.rank === 3 || player.rank === 4) ? "bg-amber-500/5" : ""
+                      )}>
+                        <td className="px-6 py-4">
+                          <span className={cn(
+                            "flex items-center justify-center w-8 h-8 rounded-lg font-bold transition-colors",
+                            player.rank === 1 ? "bg-yellow-500 text-yellow-950" : 
+                            player.rank === 2 ? "bg-slate-400 text-slate-900" :
+                            (player.rank === 3 || player.rank === 4) ? "bg-amber-600 text-amber-50" :
+                            "bg-secondary text-foreground group-hover:bg-cyan-500/20 group-hover:text-cyan-400"
+                          )}>
+                            {player.rank === 4 ? 3 : player.rank}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <span className={cn(
+                              "font-medium",
+                              player.rank === 1 ? "text-yellow-500 font-bold text-base" : "text-foreground"
+                            )}>{player.name}</span>
+                            {player.rank === 1 && <Crown className="w-4 h-4 text-yellow-500" />}
+                            {player.rank === 2 && <Medal className="w-3.5 h-3.5 text-slate-400" />}
+                            {(player.rank === 3 || player.rank === 4) && <Award className="w-3.5 h-3.5 text-amber-500" />}
+                            {player.rank > 4 && player.source === 'elimination' && <Star className="w-3 h-3 text-cyan-400/50" />}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center hidden sm:table-cell">
+                          <span className={cn(
+                            "px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider",
+                            player.source === 'elimination' ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                          )}>
+                            {player.source === 'elimination' ? 'Eliminación' : 'Fase de Grupos'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-8 flex justify-center">
+                <button onClick={() => setShowRanking(false)} className="text-xs text-muted-foreground hover:text-cyan-400 transition-colors uppercase tracking-widest font-bold flex items-center gap-2">
+                  Ver cuadro de llaves <ArrowDown className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(!isFinished || !showRanking) && (
+            <div className="relative">
+              {isFinished && (
+                <div className="flex justify-center mb-8 animate-fade-in">
+                  <button onClick={() => setShowRanking(true)} className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl scale-110 shadow-cyan-500/20">
+                    <Trophy className="w-5 h-5" /> Ver Ranking Final
+                  </button>
+                </div>
+              )}
+              
+              <div style={{ position: 'relative', width: canvasW, height: canvasH }}>
+                {rounds.map(round => (
+                  <div key={`lbl-${round}`} style={{ position: 'absolute', top: PADDING, left: colX(round), width: CARD_W }} className="text-center text-xs font-semibold text-cyan-400 uppercase tracking-wider">
+                    {roundLabel(round)}
+                  </div>
+                ))}
+
+                <svg style={{ position: 'absolute', top: 0, left: 0, width: canvasW, height: canvasH, overflow: 'visible' }} className="pointer-events-none">
+                  {rounds.slice(0, -1).map(round => {
+                    const nextRound = round + 1;
+                    const nextMatches = matches.filter(m => m.round === nextRound);
+                    return nextMatches.map(parent => {
+                      const c1Num = parent.match_number * 2 - 1;
+                      const c2Num = parent.match_number * 2;
+                      const y1 = matchY[round]?.[c1Num];
+                      const y2 = matchY[round]?.[c2Num];
+                      const yP = matchY[nextRound]?.[parent.match_number];
+                      if (y1 === undefined || y2 === undefined || yP === undefined) return null;
+
+                      const xRight = colX(round) + CARD_W;
+                      const xLeft  = colX(nextRound);
+                      const xMid   = xRight + COL_GAP / 2;
+                      const cy1 = y1 + CARD_H / 2;
+                      const cy2 = y2 + CARD_H / 2;
+                      const cyP = yP + CARD_H / 2;
+
+                      return (
+                        <g key={`conn-${round}-${parent.match_number}`}>
+                          <line x1={xRight} y1={cy1} x2={xMid} y2={cy1} stroke="hsl(var(--border))" strokeWidth="1.5" />
+                          <line x1={xRight} y1={cy2} x2={xMid} y2={cy2} stroke="hsl(var(--border))" strokeWidth="1.5" />
+                          <line x1={xMid} y1={cy1} x2={xMid} y2={cy2} stroke="hsl(var(--border))" strokeWidth="1.5" />
+                          <line x1={xMid} y1={cyP} x2={xLeft} y2={cyP} stroke="hsl(var(--border))" strokeWidth="1.5" />
+                        </g>
+                      );
+                    });
+                  })}
+                </svg>
+
+                {matches.map(match => {
+                  const x = colX(match.round);
+                  const y = matchY[match.round]?.[match.match_number] ?? 0;
+                  const nextMatch = matches.find(m => m.round === match.round + 1 && m.match_number === Math.ceil(match.match_number / 2));
+                  const canSetWinner = isAdmin && !isFinished && !match.bye && !!match.player1_id && !!match.player2_id && (!nextMatch || !nextMatch.winner_id);
+
+                  return (
+                    <div key={match.id} style={{ position: 'absolute', left: x, top: y, width: CARD_W, height: CARD_H }} className="rounded-lg border border-border bg-card overflow-hidden shadow-sm flex flex-col justify-center">
+                      <PlayerRow
+                        matchId={match.id}
+                        slot="p1"
+                        name={match.bye && !match.player1_id ? 'BYE' : match.player1_name}
+                        playerId={match.player1_id}
+                        winnerId={match.winner_id}
+                        canClick={!!canSetWinner}
+                        canDrag={canDrag && match.round === 1}
+                        saving={saving === match.id}
+                        onClick={() => match.player1_id && setWinner(match.id, match.player1_id)}
+                        position={match.round === 1 ? match.match_number * 2 - 1 : undefined}
+                        isConfirming={confirmingSlot === `${match.id}-${match.player1_id}`}
+                        onStartConfirm={() => match.player1_id && setConfirmingSlot(`${match.id}-${match.player1_id}`)}
+                        onCancelConfirm={() => setConfirmingSlot(null)}
+                      />
+                      <div className="border-t border-border/50 mx-2" />
+                      <PlayerRow
+                        matchId={match.id}
+                        slot="p2"
+                        name={match.bye && !match.player2_id ? 'BYE' : match.player2_name}
+                        playerId={match.player2_id}
+                        winnerId={match.winner_id}
+                        canClick={!!canSetWinner && match.bye !== true && match.bye !== 'true'}
+                        canDrag={canDrag && match.round === 1}
+                        saving={saving === match.id}
+                        onClick={() => match.player2_id && setWinner(match.id, match.player2_id)}
+                        position={match.round === 1 ? match.match_number * 2 : undefined}
+                        isConfirming={confirmingSlot === `${match.id}-${match.player2_id}`}
+                        onStartConfirm={() => match.player2_id && setConfirmingSlot(`${match.id}-${match.player2_id}`)}
+                        onCancelConfirm={() => setConfirmingSlot(null)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+    </DndContext>
+  );
 }
 
 function PlayerRow({
-  name, playerId, winnerId, canClick, saving, onClick, position, isConfirming, onStartConfirm, onCancelConfirm
+  matchId, slot, name, playerId, winnerId, canClick, canDrag, saving, onClick, position, isConfirming, onStartConfirm, onCancelConfirm
 }: {
+  matchId: number
+  slot: 'p1' | 'p2'
   name: string | null
   playerId: number | null
   winnerId: number | null
   canClick: boolean
+  canDrag?: boolean
   saving: boolean
   onClick: () => void
   position?: number
@@ -289,6 +634,24 @@ function PlayerRow({
   onStartConfirm?: () => void
   onCancelConfirm?: () => void
 }) {
+  const compositeId = `${matchId}-${slot}`
+  
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: compositeId,
+    disabled: !canDrag || !playerId
+  })
+
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: compositeId,
+    disabled: !canDrag
+  })
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    zIndex: 1000,
+    position: 'relative' as const
+  } : undefined
+
   const isWinner = !!playerId && winnerId === playerId
   const isLoser  = !!winnerId && !!playerId && winnerId !== playerId
 
@@ -318,25 +681,34 @@ function PlayerRow({
 
   return (
     <div
-      onClick={handleClick}
-      style={{ height: PLAYER_H }}
-      className={`w-full flex items-center gap-2 px-3 text-xs transition-all
-        ${canClick ? 'hover:bg-cyan-500/10 cursor-pointer' : 'cursor-default'}
-        ${isWinner ? 'bg-cyan-500/10' : ''}
-        ${saving ? 'opacity-50' : ''}
-      `}
+      ref={(node) => {
+        setNodeRef(node)
+        setDroppableRef(node)
+      }}
+      style={{ ...style, height: PLAYER_H }}
+      className={cn(
+        "w-full flex items-center gap-2 px-3 text-xs transition-colors relative",
+        canClick && !isDragging ? 'hover:bg-cyan-500/10 cursor-pointer' : 'cursor-default',
+        isOver && "bg-cyan-500/20 ring-1 ring-cyan-500 ring-inset",
+        isWinner && "bg-cyan-500/10",
+        saving && "opacity-50",
+        isDragging && "opacity-20 z-50",
+        canDrag && playerId && "group/drag"
+      )}
     >
-      {/* Position */}
-      {position !== undefined && (
-        <span className="text-[10px] text-muted-foreground/60 w-4 font-mono text-left select-none">
-          {position}
-        </span>
+      {/* Drag Handle */}
+      {canDrag && playerId && (
+        <div {...attributes} {...listeners} className="absolute left-1 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/30 hover:text-cyan-400 transition-colors z-10">
+          <GripVertical className="w-3 h-3" />
+        </div>
       )}
 
-      {/* Indicador */}
-      <span className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 flex items-center justify-center transition-colors ${
+      {/* Indicador - Ajustado padding cuando hay handle */}
+      <span onClick={handleClick} className={cn(
+        "w-3.5 h-3.5 rounded-full border flex-shrink-0 flex items-center justify-center transition-colors",
+        canDrag && playerId ? "ml-3" : "",
         isWinner ? 'bg-cyan-500 border-cyan-500' : 'border-border'
-      }`}>
+      )}>
         {isWinner && (
           <svg className="w-2 h-2 text-slate-900" fill="none" viewBox="0 0 8 8">
             <path d="M1.5 4l2 2 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -345,26 +717,21 @@ function PlayerRow({
       </span>
 
       {/* Nombre */}
-      <span className={`flex-1 text-left truncate font-medium ${
+      <span onClick={handleClick} className={cn(
+        "flex-1 text-left truncate font-medium",
         isWinner ? 'text-cyan-400' :
         isLoser  ? 'text-muted-foreground/40 line-through' :
         !playerId ? 'text-muted-foreground/40 italic font-normal' :
         'text-foreground'
-      }`}>
+      )}>
         {name ?? 'Por definir'}
       </span>
 
       {/* Confirmación */}
       {isConfirming && (
         <div className="flex gap-1 ml-auto">
-          <button
-            onClick={handleConfirm}
-            className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400"
-          >✓</button>
-          <button
-            onClick={handleCancel}
-            className="text-[10px] px-1.5 py-0.5 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground"
-          >✕</button>
+          <button onClick={handleConfirm} className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400">✓</button>
+          <button onClick={handleCancel} className="text-[10px] px-1.5 py-0.5 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground">✕</button>
         </div>
       )}
     </div>
