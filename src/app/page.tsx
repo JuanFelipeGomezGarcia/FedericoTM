@@ -14,14 +14,14 @@ interface Tournament {
 
 // Foundation photos
 const heroImages = [
-  '/assets/26-IMG_3585.jpg.jpeg',
-  '/assets/32-IMG_3623.jpg.jpeg',
-  '/assets/37-IMG_3643.jpg.jpeg',
-  '/assets/44-IMG_3728.jpg.jpeg',
-  '/assets/60-IMG_3835.jpg.jpeg',
-  '/assets/64-IMG_3866.jpg.jpeg',
-  '/assets/65-IMG_3876.jpg.jpeg',
-  '/assets/IMG_20260413_140525.jpg.jpeg'
+  '/assets/26-IMG_3585.jpg',
+  '/assets/32-IMG_3623.jpg',
+  '/assets/37-IMG_3643.jpg',
+  '/assets/44-IMG_3728.jpg',
+  '/assets/60-IMG_3835.jpg',
+  '/assets/64-IMG_3866.jpg',
+  '/assets/65-IMG_3876.jpg',
+  '/assets/IMG_20260413_140525.jpg'
 ]
 
 export default function Home() {
