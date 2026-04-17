@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Trophy, Medal, Star, Award, Crown, ArrowDown, ArrowLeft, GripVertical, UserPlus } from 'lucide-react'
+import { Trophy, Medal, Star, Award, Crown, ArrowDown, ArrowLeft, GripVertical, UserPlus, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DndContext,
@@ -66,6 +66,10 @@ export default function BracketPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [newPlayerName, setNewPlayerName] = useState('')
 
+  // Tables logic
+  const [tablesCount, setTablesCount] = useState<number>(0)
+  const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { categoryId, groupId, matchId, p1Name, p2Name }
+
   // DnD Sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -75,7 +79,73 @@ export default function BracketPage() {
 
   useEffect(() => { 
     setIsAdmin(!!localStorage.getItem('admin-token')) 
-  }, [])
+    
+    // Load tables config
+    const count = parseInt(localStorage.getItem(`tournament_${tournamentId}_tables_count`) || '0')
+    setTablesCount(count)
+    
+    // Load current assignments
+    const saved = localStorage.getItem(`tournament_${tournamentId}_table_assignments`)
+    if (saved) {
+      try {
+        setTableAssignments(JSON.parse(saved))
+      } catch (e) {
+        console.error("Error loading table assignments", e)
+      }
+    }
+  }, [tournamentId])
+
+  // Sync tables across tabs
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === `tournament_${tournamentId}_table_assignments`) {
+        if (e.newValue) setTableAssignments(JSON.parse(e.newValue))
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [tournamentId])
+
+  const saveTableAssignments = (newAssignments: Record<number, any>) => {
+    setTableAssignments(newAssignments)
+    localStorage.setItem(`tournament_${tournamentId}_table_assignments`, JSON.stringify(newAssignments))
+  }
+
+  const assignTable = (tableNumber: number, match: Match) => {
+    const newAssignments = { ...tableAssignments }
+    
+    // If this match was already on another table, remove it from there
+    Object.keys(newAssignments).forEach(num => {
+      if (newAssignments[parseInt(num)].matchId === match.id && newAssignments[parseInt(num)].categoryId === categoryId) {
+        delete newAssignments[parseInt(num)]
+      }
+    })
+
+    if (tableNumber > 0) {
+      newAssignments[tableNumber] = {
+        categoryId,
+        matchId: match.id,
+        p1Name: match.player1_name || '?',
+        p2Name: match.player2_name || '?',
+        round: match.round,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    }
+    
+    saveTableAssignments(newAssignments)
+  }
+
+  const releaseTable = (matchId: number) => {
+    const newAssignments = { ...tableAssignments }
+    let changed = false
+    Object.keys(newAssignments).forEach(num => {
+      if (newAssignments[parseInt(num)].matchId === matchId && newAssignments[parseInt(num)].categoryId === categoryId) {
+        delete newAssignments[parseInt(num)]
+        changed = true
+      }
+    })
+    if (changed) saveTableAssignments(newAssignments)
+  }
 
   const fetchStandings = useCallback(async () => {
     try {
@@ -109,7 +179,10 @@ export default function BracketPage() {
         body: JSON.stringify({ id: matchId, winner_id: winnerId })
       })
       setSaving(null)
-      if (res.ok) setMatches(await res.json())
+      if (res.ok) {
+        setMatches(await res.json())
+        releaseTable(matchId) // Auto-release table when winner is set
+      }
     } catch (e) { 
       setSaving(null)
       console.error(e) 
@@ -411,6 +484,46 @@ export default function BracketPage() {
         )}
 
         <main className={cn("py-8 px-4 overflow-auto transition-opacity", swapping && "opacity-50 pointer-events-none")}>
+          {/* ── Panel de Mesas (Solo si hay mesas configuradas) ── */}
+          {tablesCount > 0 && (
+            <div className="max-w-7xl mx-auto mb-10 animate-fade-in px-4">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                </div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Control de Mesas</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+                {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => {
+                  const assignment = tableAssignments[num]
+                  const isOccupied = !!assignment
+                  
+                  return (
+                    <div key={num} className={cn(
+                      "border rounded-xl p-3 flex flex-col items-center justify-center gap-1 transition-all",
+                      isOccupied ? 'bg-rose-500/5 border-rose-500/30' : 'bg-emerald-500/5 border-emerald-500/10'
+                    )}>
+                      <span className={cn(
+                        "text-[9px] font-black px-2 py-0.5 rounded-full mb-1",
+                        isOccupied ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
+                      )}>MESA {num}</span>
+                      {isOccupied ? (
+                        <div className="text-[10px] text-center w-full animate-in fade-in zoom-in duration-300">
+                          <div className="font-bold text-foreground truncate">{assignment.p1Name}</div>
+                          <div className="text-[8px] text-muted-foreground/40 leading-none my-0.5">VS</div>
+                          <div className="font-bold text-foreground truncate">{assignment.p2Name}</div>
+                        </div>
+                      ) : (
+                        <span className="text-[9px] text-muted-foreground/30">Libre</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {isFinished && showRanking && finalRanking.length > 0 && (
             <div className="max-w-5xl mx-auto mb-16 animate-fade-in text-center">
               <div className="flex flex-col items-center mb-10">
@@ -528,86 +641,111 @@ export default function BracketPage() {
                 </div>
               )}
               
-              <div style={{ position: 'relative', width: canvasW, height: canvasH }}>
-                {rounds.map(round => (
-                  <div key={`lbl-${round}`} style={{ position: 'absolute', top: PADDING, left: colX(round), width: CARD_W }} className="text-center text-xs font-semibold text-cyan-400 uppercase tracking-wider">
-                    {roundLabel(round)}
-                  </div>
-                ))}
-
-                <svg style={{ position: 'absolute', top: 0, left: 0, width: canvasW, height: canvasH, overflow: 'visible' }} className="pointer-events-none">
-                  {rounds.slice(0, -1).map(round => {
-                    const nextRound = round + 1;
-                    const nextMatches = matches.filter(m => m.round === nextRound);
-                    return nextMatches.map(parent => {
-                      const c1Num = parent.match_number * 2 - 1;
-                      const c2Num = parent.match_number * 2;
-                      const y1 = matchY[round]?.[c1Num];
-                      const y2 = matchY[round]?.[c2Num];
-                      const yP = matchY[nextRound]?.[parent.match_number];
-                      if (y1 === undefined || y2 === undefined || yP === undefined) return null;
-
-                      const xRight = colX(round) + CARD_W;
-                      const xLeft  = colX(nextRound);
-                      const xMid   = xRight + COL_GAP / 2;
-                      const cy1 = y1 + CARD_H / 2;
-                      const cy2 = y2 + CARD_H / 2;
-                      const cyP = yP + CARD_H / 2;
-
-                      return (
-                        <g key={`conn-${round}-${parent.match_number}`}>
-                          <line x1={xRight} y1={cy1} x2={xMid} y2={cy1} stroke="hsl(var(--border))" strokeWidth="1.5" />
-                          <line x1={xRight} y1={cy2} x2={xMid} y2={cy2} stroke="hsl(var(--border))" strokeWidth="1.5" />
-                          <line x1={xMid} y1={cy1} x2={xMid} y2={cy2} stroke="hsl(var(--border))" strokeWidth="1.5" />
-                          <line x1={xMid} y1={cyP} x2={xLeft} y2={cyP} stroke="hsl(var(--border))" strokeWidth="1.5" />
-                        </g>
-                      );
-                    });
-                  })}
-                </svg>
-
-                {matches.map(match => {
-                  const x = colX(match.round);
-                  const y = matchY[match.round]?.[match.match_number] ?? 0;
-                  const nextMatch = matches.find(m => m.round === match.round + 1 && m.match_number === Math.ceil(match.match_number / 2));
-                  const canSetWinner = isAdmin && !isFinished && !match.bye && !!match.player1_id && !!match.player2_id && (!nextMatch || !nextMatch.winner_id);
-
-                  return (
-                    <div key={match.id} style={{ position: 'absolute', left: x, top: y, width: CARD_W, height: CARD_H }} className="rounded-lg border border-border bg-card overflow-hidden shadow-sm flex flex-col justify-center">
-                      <PlayerRow
-                        matchId={match.id}
-                        slot="p1"
-                        name={match.bye && !match.player1_id ? 'BYE' : match.player1_name}
-                        playerId={match.player1_id}
-                        winnerId={match.winner_id}
-                        canClick={!!canSetWinner}
-                        canDrag={canDrag && match.round === 1}
-                        saving={saving === match.id}
-                        onClick={() => match.player1_id && setWinner(match.id, match.player1_id)}
-                        position={match.round === 1 ? match.match_number * 2 - 1 : undefined}
-                        isConfirming={confirmingSlot === `${match.id}-${match.player1_id}`}
-                        onStartConfirm={() => match.player1_id && setConfirmingSlot(`${match.id}-${match.player1_id}`)}
-                        onCancelConfirm={() => setConfirmingSlot(null)}
-                      />
-                      <div className="border-t border-border/50 mx-2" />
-                      <PlayerRow
-                        matchId={match.id}
-                        slot="p2"
-                        name={match.bye && !match.player2_id ? 'BYE' : match.player2_name}
-                        playerId={match.player2_id}
-                        winnerId={match.winner_id}
-                        canClick={!!canSetWinner && match.bye !== true && match.bye !== 'true'}
-                        canDrag={canDrag && match.round === 1}
-                        saving={saving === match.id}
-                        onClick={() => match.player2_id && setWinner(match.id, match.player2_id)}
-                        position={match.round === 1 ? match.match_number * 2 : undefined}
-                        isConfirming={confirmingSlot === `${match.id}-${match.player2_id}`}
-                        onStartConfirm={() => match.player2_id && setConfirmingSlot(`${match.id}-${match.player2_id}`)}
-                        onCancelConfirm={() => setConfirmingSlot(null)}
-                      />
+              {/* Wrapper horizontal scroll para móvil */}
+              <div className="overflow-x-auto overflow-y-visible pb-10">
+                <div style={{ position: 'relative', width: canvasW, height: canvasH, minWidth: canvasW }}>
+                  {rounds.map(round => (
+                    <div key={`lbl-${round}`} style={{ position: 'absolute', top: PADDING, left: colX(round), width: CARD_W }} className="text-center text-xs font-semibold text-cyan-400 uppercase tracking-wider">
+                      {roundLabel(round)}
                     </div>
-                  );
-                })}
+                  ))}
+
+                  <svg style={{ position: 'absolute', top: 0, left: 0, width: canvasW, height: canvasH, overflow: 'visible' }} className="pointer-events-none">
+                    {rounds.slice(0, -1).map(round => {
+                      const nextRound = round + 1;
+                      const nextMatches = matches.filter(m => m.round === nextRound);
+                      return nextMatches.map(parent => {
+                        const c1Num = parent.match_number * 2 - 1;
+                        const c2Num = parent.match_number * 2;
+                        const y1 = matchY[round]?.[c1Num];
+                        const y2 = matchY[round]?.[c2Num];
+                        const yP = matchY[nextRound]?.[parent.match_number];
+                        if (y1 === undefined || y2 === undefined || yP === undefined) return null;
+
+                        const xRight = colX(round) + CARD_W;
+                        const xLeft  = colX(nextRound);
+                        const xMid   = xRight + COL_GAP / 2;
+                        const cy1 = y1 + CARD_H / 2;
+                        const cy2 = y2 + CARD_H / 2;
+                        const cyP = yP + CARD_H / 2;
+
+                        return (
+                          <g key={`conn-${round}-${parent.match_number}`}>
+                            <line x1={xRight} y1={cy1} x2={xMid} y2={cy1} stroke="hsl(var(--border))" strokeWidth="1.5" />
+                            <line x1={xRight} y1={cy2} x2={xMid} y2={cy2} stroke="hsl(var(--border))" strokeWidth="1.5" />
+                            <line x1={xMid} y1={cy1} x2={xMid} y2={cy2} stroke="hsl(var(--border))" strokeWidth="1.5" />
+                            <line x1={xMid} y1={cyP} x2={xLeft} y2={cyP} stroke="hsl(var(--border))" strokeWidth="1.5" />
+                          </g>
+                        );
+                      });
+                    })}
+                  </svg>
+
+                  {matches.map(match => {
+                    const x = colX(match.round);
+                    const y = matchY[match.round]?.[match.match_number] ?? 0;
+                    const nextMatch = matches.find(m => m.round === match.round + 1 && m.match_number === Math.ceil(match.match_number / 2));
+                    const canSetWinner = isAdmin && !isFinished && !match.bye && !!match.player1_id && !!match.player2_id && (!nextMatch || !nextMatch.winner_id);
+
+                    return (
+                      <div key={match.id} style={{ position: 'absolute', left: x, top: y, width: CARD_W, height: CARD_H }} className="rounded-lg border border-border bg-card shadow-sm flex flex-col justify-center relative">
+                        <PlayerRow
+                          matchId={match.id}
+                          slot="p1"
+                          name={match.bye && !match.player1_id ? 'BYE' : match.player1_name}
+                          playerId={match.player1_id}
+                          winnerId={match.winner_id}
+                          canClick={!!canSetWinner}
+                          canDrag={canDrag && match.round === 1}
+                          saving={saving === match.id}
+                          onClick={() => match.player1_id && setWinner(match.id, match.player1_id)}
+                          position={match.round === 1 ? match.match_number * 2 - 1 : undefined}
+                          isConfirming={confirmingSlot === `${match.id}-${match.player1_id}`}
+                          onStartConfirm={() => match.player1_id && setConfirmingSlot(`${match.id}-${match.player1_id}`)}
+                          onCancelConfirm={() => setConfirmingSlot(null)}
+                        />
+                        <div className="border-t border-border/50 mx-2" />
+                        <PlayerRow
+                          matchId={match.id}
+                          slot="p2"
+                          name={match.bye && !match.player2_id ? 'BYE' : match.player2_name}
+                          playerId={match.player2_id}
+                          winnerId={match.winner_id}
+                          canClick={!!canSetWinner && match.bye !== true && match.bye !== 'true'}
+                          canDrag={canDrag && match.round === 1}
+                          saving={saving === match.id}
+                          onClick={() => match.player2_id && setWinner(match.id, match.player2_id)}
+                          position={match.round === 1 ? match.match_number * 2 : undefined}
+                          isConfirming={confirmingSlot === `${match.id}-${match.player2_id}`}
+                          onStartConfirm={() => match.player2_id && setConfirmingSlot(`${match.id}-${match.player2_id}`)}
+                          onCancelConfirm={() => setConfirmingSlot(null)}
+                        />
+                        
+                        {/* Mesa Selector */}
+                        {isAdmin && tablesCount > 0 && !match.winner_id && !match.bye && (
+                          <div className="absolute -bottom-2.5 right-1 z-[100]">
+                            <select
+                              className="bg-card border border-border/80 text-[7px] font-black text-muted-foreground uppercase tracking-widest px-1.5 py-0.5 rounded shadow-lg hover:border-cyan-500/50 hover:text-cyan-400 transition-all outline-none cursor-pointer appearance-none text-center min-w-[60px]"
+                              value={Object.keys(tableAssignments).find(num => tableAssignments[num].matchId === match.id && tableAssignments[num].categoryId === categoryId) || ""}
+                              onChange={(e) => assignTable(parseInt(e.target.value) || 0, match)}
+                            >
+                              <option value="">MESAS —</option>
+                              {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => (
+                                <option 
+                                  key={num} 
+                                  value={num} 
+                                  disabled={!!tableAssignments[num] && tableAssignments[num].matchId !== match.id}
+                                >
+                                  Mesa {num} {tableAssignments[num] ? '(Ocupada)' : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -630,110 +768,76 @@ function PlayerRow({
   saving: boolean
   onClick: () => void
   position?: number
-  isConfirming?: boolean
-  onStartConfirm?: () => void
-  onCancelConfirm?: () => void
+  isConfirming: boolean
+  onStartConfirm: () => void
+  onCancelConfirm: () => void
 }) {
-  const compositeId = `${matchId}-${slot}`
-  
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: compositeId,
+    id: `${matchId}-${slot}`,
     disabled: !canDrag || !playerId
   })
 
-  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
-    id: compositeId,
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `${matchId}-${slot}`,
     disabled: !canDrag
   })
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    zIndex: 1000,
-    position: 'relative' as const
+    zIndex: isDragging ? 100 : 1,
   } : undefined
 
-  const isWinner = !!playerId && winnerId === playerId
-  const isLoser  = !!winnerId && !!playerId && winnerId !== playerId
-
-  useEffect(() => {
-    if (isConfirming && onCancelConfirm) {
-      onCancelConfirm()
-    }
-  }, [winnerId, playerId])
-
-  const handleClick = () => {
-    if (!canClick || saving) return
-    if (!isConfirming && onStartConfirm) {
-      onStartConfirm()
-    }
-  }
-
-  const handleConfirm = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (onCancelConfirm) onCancelConfirm()
-    onClick()
-  }
-
-  const handleCancel = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (onCancelConfirm) onCancelConfirm()
-  }
-
   return (
-    <div
-      ref={(node) => {
-        setNodeRef(node)
-        setDroppableRef(node)
-      }}
-      style={{ ...style, height: PLAYER_H }}
+    <div 
+      ref={(node) => { setNodeRef(node); setDropRef(node); }}
+      style={style}
+      {...attributes}
+      {...listeners}
       className={cn(
-        "w-full flex items-center gap-2 px-3 text-xs transition-colors relative",
-        canClick && !isDragging ? 'hover:bg-cyan-500/10 cursor-pointer' : 'cursor-default',
-        isOver && "bg-cyan-500/20 ring-1 ring-cyan-500 ring-inset",
-        isWinner && "bg-cyan-500/10",
-        saving && "opacity-50",
-        isDragging && "opacity-20 z-50",
-        canDrag && playerId && "group/drag"
+        "h-[32px] px-3 flex items-center justify-between text-[11px] font-bold transition-all relative group/row",
+        winnerId === playerId && playerId !== null ? "bg-cyan-500/10 text-cyan-400" : "text-foreground/80",
+        isOver && canDrag && "bg-cyan-500/20 ring-1 ring-inset ring-cyan-500/50",
+        isDragging && "opacity-50 ring-2 ring-cyan-500 scale-105",
+        canDrag && playerId && "cursor-grab active:cursor-grabbing hover:bg-white/5"
       )}
     >
-      {/* Drag Handle */}
-      {canDrag && playerId && (
-        <div {...attributes} {...listeners} className="absolute left-1 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/30 hover:text-cyan-400 transition-colors z-10">
-          <GripVertical className="w-3 h-3" />
-        </div>
-      )}
-
-      {/* Indicador - Ajustado padding cuando hay handle */}
-      <span onClick={handleClick} className={cn(
-        "w-3.5 h-3.5 rounded-full border flex-shrink-0 flex items-center justify-center transition-colors",
-        canDrag && playerId ? "ml-3" : "",
-        isWinner ? 'bg-cyan-500 border-cyan-500' : 'border-border'
-      )}>
-        {isWinner && (
-          <svg className="w-2 h-2 text-slate-900" fill="none" viewBox="0 0 8 8">
-            <path d="M1.5 4l2 2 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+      <div className="flex items-center gap-2 overflow-hidden flex-1">
+        {position && (
+          <span className="text-[8px] text-muted-foreground/40 font-black w-4">{position}</span>
         )}
-      </span>
+        <span className="truncate">{name || ''}</span>
+      </div>
 
-      {/* Nombre */}
-      <span onClick={handleClick} className={cn(
-        "flex-1 text-left truncate font-medium",
-        isWinner ? 'text-cyan-400' :
-        isLoser  ? 'text-muted-foreground/40 line-through' :
-        !playerId ? 'text-muted-foreground/40 italic font-normal' :
-        'text-foreground'
-      )}>
-        {name ?? 'Por definir'}
-      </span>
-
-      {/* Confirmación */}
-      {isConfirming && (
-        <div className="flex gap-1 ml-auto">
-          <button onClick={handleConfirm} className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400">✓</button>
-          <button onClick={handleCancel} className="text-[10px] px-1.5 py-0.5 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground">✕</button>
+      {canClick && !saving && (
+        <div className="flex items-center gap-1 absolute right-1">
+          {isConfirming ? (
+            <div className="flex items-center gap-1 animate-in slide-in-from-right-1 duration-200">
+              <button 
+                onClick={(e) => { e.stopPropagation(); onClick(); }}
+                className="bg-cyan-500 text-slate-950 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter"
+              >
+                ✓
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onCancelConfirm(); }}
+                className="bg-secondary text-muted-foreground px-1.5 py-0.5 rounded text-[8px]"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={(e) => { e.stopPropagation(); onStartConfirm(); }}
+              className="bg-secondary/80 hover:bg-cyan-500/20 text-muted-foreground hover:text-cyan-400 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase transition-colors"
+            >
+              Gana
+            </button>
+          )}
         </div>
       )}
+      
+      {saving && <div className="w-3 h-3 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />}
+      {winnerId === playerId && playerId !== null && <Trophy className="w-3 h-3 text-cyan-400 shrink-0" />}
     </div>
   )
 }

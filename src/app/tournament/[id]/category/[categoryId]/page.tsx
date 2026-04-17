@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
 import { ArrowLeft } from 'lucide-react'
 import { generateBergerSchedule } from '@/lib/berger'
+import { cn } from '@/lib/utils'
 
 interface Category {
   id: number
@@ -64,6 +65,10 @@ export default function CategoryPage() {
   const [editingCell, setEditingCell] = useState<{ matchId: number; rowPlayerId: number; value: string } | null>(null)
   const [savingId, setSavingId] = useState<number | null>(null)
   const [cellError, setCellError] = useState<{ matchId: number; msg: string } | null>(null)
+  
+  // Tables logic
+  const [tablesCount, setTablesCount] = useState<number>(0)
+  const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { categoryId, groupId, matchId, p1Name, p2Name }
 
   // Tiebreak panel
   const [tiebreakGroup, setTiebreakGroup] = useState<number | null>(null)
@@ -157,7 +162,75 @@ export default function CategoryPage() {
 
   useEffect(() => {
     setIsAdmin(!!localStorage.getItem('admin-token'))
-  }, [])
+    
+    // Load tables config
+    const count = parseInt(localStorage.getItem(`tournament_${tournamentId}_tables_count`) || '0')
+    setTablesCount(count)
+    
+    // Load current assignments
+    const saved = localStorage.getItem(`tournament_${tournamentId}_table_assignments`)
+    if (saved) {
+      try {
+        setTableAssignments(JSON.parse(saved))
+      } catch (e) {
+        console.error("Error loading table assignments", e)
+      }
+    }
+  }, [tournamentId])
+
+  // Sync tables across tabs
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === `tournament_${tournamentId}_table_assignments`) {
+        if (e.newValue) setTableAssignments(JSON.parse(e.newValue))
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [tournamentId])
+
+  const saveTableAssignments = (newAssignments: Record<number, any>) => {
+    setTableAssignments(newAssignments)
+    localStorage.setItem(`tournament_${tournamentId}_table_assignments`, JSON.stringify(newAssignments))
+  }
+
+  const assignTable = (tableNumber: number, match: Match, groupName: string) => {
+    const newAssignments = { ...tableAssignments }
+    
+    // If this match was already on another table, remove it from there
+    Object.keys(newAssignments).forEach(num => {
+      if (newAssignments[parseInt(num)].matchId === match.id) {
+        delete newAssignments[parseInt(num)]
+      }
+    })
+
+    if (tableNumber > 0) {
+      newAssignments[tableNumber] = {
+        categoryId,
+        categoryName: category?.name,
+        groupId: match.group_id,
+        groupName,
+        matchId: match.id,
+        p1Name: match.player1_name,
+        p2Name: match.player2_name,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    }
+    
+    saveTableAssignments(newAssignments)
+  }
+
+  const releaseTable = (matchId: number) => {
+    const newAssignments = { ...tableAssignments }
+    let changed = false
+    Object.keys(newAssignments).forEach(num => {
+      if (newAssignments[parseInt(num)].matchId === matchId) {
+        delete newAssignments[parseInt(num)]
+        changed = true
+      }
+    })
+    if (changed) saveTableAssignments(newAssignments)
+  }
 
   const startEdit = (match: Match, rowPlayerId: number) => {
     if (category?.is_finished || !isAdmin) return
@@ -201,6 +274,7 @@ export default function CategoryPage() {
         if (Number(m.id) !== Number(matchId)) return m
         return { ...m, result: value || null }
       }))
+      if (value) releaseTable(matchId) // Auto-release table when result is entered
       fetchStandings()
     }
   }
@@ -321,13 +395,27 @@ export default function CategoryPage() {
             </Link>
             <div className="hidden sm:block h-6 w-px bg-border/40" />
             <div className="flex flex-col">
-              <Link
-                href={isAdmin ? `/admin` : `/tournament/${tournamentId}`}
-                className="text-muted-foreground hover:text-cyan-400 text-xs transition-colors flex items-center gap-1"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                {isAdmin ? 'Panel Admin' : 'Torneo'}
-              </Link>
+              <div className="flex items-center gap-2 mb-0.5">
+                {isAdmin && (
+                  <>
+                    <Link
+                      href="/admin"
+                      className="text-muted-foreground hover:text-cyan-400 text-[10px] font-bold uppercase tracking-tight transition-colors flex items-center gap-1"
+                    >
+                      <ArrowLeft className="w-2.5 h-2.5" />
+                      Panel Admin
+                    </Link>
+                    <span className="text-muted-foreground/30 text-[10px]">|</span>
+                  </>
+                )}
+                <Link
+                  href={`/tournament/${tournamentId}`}
+                  className="text-muted-foreground hover:text-cyan-400 text-[10px] font-bold uppercase tracking-tight transition-colors flex items-center gap-1"
+                >
+                  {!isAdmin && <ArrowLeft className="w-2.5 h-2.5" />}
+                  Torneo
+                </Link>
+              </div>
               <h1 className="text-lg font-bold text-foreground leading-tight">{category.name}</h1>
             </div>
           </div>
@@ -355,6 +443,61 @@ export default function CategoryPage() {
       </header>
 
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-10">
+        {/* ── Panel de Mesas (Solo si hay mesas configuradas) ── */}
+        {tablesCount > 0 && (
+          <div className="max-w-7xl mx-auto mb-10 animate-fade-in">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+              </div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Control de Mesas</h3>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+              {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => {
+                const assignment = tableAssignments[num]
+                const isOccupied = !!assignment
+                
+                return (
+                  <div key={num} className={cn(
+                    "border rounded-xl p-3 flex flex-col items-center justify-center gap-1 transition-all",
+                    isOccupied ? 'bg-rose-500/5 border-rose-500/30' : 'bg-emerald-500/5 border-emerald-500/10'
+                  )}>
+                    <span className={cn(
+                      "text-[9px] font-black px-2 py-0.5 rounded-full mb-1",
+                      isOccupied ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
+                    )}>MESA {num}</span>
+                    {isOccupied ? (
+                      <div className="text-[10px] text-center w-full animate-in fade-in zoom-in duration-300">
+                        <div className="text-[9px] text-rose-400/70 font-bold uppercase truncate w-full mb-0.5 px-1 leading-none">
+                          {assignment.categoryName} — {assignment.groupName}
+                        </div>
+                        <div className="font-bold text-foreground truncate">{assignment.p1Name}</div>
+                        <div className="text-[8px] text-muted-foreground/40 leading-none my-0.5">VS</div>
+                        <div className="font-bold text-foreground truncate">{assignment.p2Name}</div>
+                        {isAdmin && (
+                          <button 
+                            onClick={() => {
+                              const next = {...tableAssignments};
+                              delete next[num];
+                              saveTableAssignments(next);
+                            }}
+                            className="mt-1 text-[9px] text-muted-foreground hover:text-rose-400"
+                          >
+                            Liberar
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[9px] text-muted-foreground/30">Libre</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {groups.map(group => {
           const players = (group.players ?? [])
             .filter(p => p.id)
@@ -693,9 +836,30 @@ export default function CategoryPage() {
                                       </span>
                                     </div>
                                   </div>
-                                  {isDone && (
+                                  {isDone ? (
                                     <div className="flex items-center justify-center shrink-0">
                                       <span className="text-xs text-emerald-500 font-black">✓</span>
+                                    </div>
+                                  ) : isAdmin && tablesCount > 0 && (
+                                    <div className="flex items-center gap-2">
+                                      <select
+                                        className="bg-background border border-border/50 rounded px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground focus:border-cyan-500/50 outline-none cursor-pointer"
+                                        value={Object.keys(tableAssignments).find(num => tableAssignments[num].matchId === matchObj?.id) || ""}
+                                        onChange={(e) => {
+                                          if (matchObj) assignTable(parseInt(e.target.value) || 0, matchObj, group.name)
+                                        }}
+                                      >
+                                        <option value="">Mesa —</option>
+                                        {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => (
+                                          <option 
+                                            key={num} 
+                                            value={num} 
+                                            disabled={!!tableAssignments[num] && tableAssignments[num].matchId !== matchObj?.id}
+                                          >
+                                            Mesa {num} {tableAssignments[num] ? '(Ocup)' : ''}
+                                          </option>
+                                        ))}
+                                      </select>
                                     </div>
                                   )}
                                 </div>

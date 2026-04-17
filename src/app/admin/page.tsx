@@ -30,7 +30,7 @@ export default function AdminPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState<Step>('list')
-  const [newTournament, setNewTournament] = useState({ name: '', date: '' })
+  const [newTournament, setNewTournament] = useState({ name: '', date: '', tables: '8' })
   const [createdTournamentId, setCreatedTournamentId] = useState<number | null>(null)
   const [createdTournamentName, setCreatedTournamentName] = useState('')
   const [categories, setCategories] = useState<CategoryDraft[]>([])
@@ -70,6 +70,8 @@ export default function AdminPage() {
         const data = await res.json()
         setCreatedTournamentId(data.id)
         setCreatedTournamentName(data.name)
+        // Store table configuration locally
+        localStorage.setItem(`tournament_${data.id}_tables_count`, newTournament.tables)
         setStep('add-categories')
       } else {
         setFormError('Error al crear el torneo')
@@ -115,7 +117,7 @@ export default function AdminPage() {
     await fetchTournaments()
     setStep('list')
     setCategories([])
-    setNewTournament({ name: '', date: '' })
+    setNewTournament({ name: '', date: '', tables: '8' })
     setCreatedTournamentId(null)
     setFinalizingTournament(false)
     router.push(`/tournament/${createdTournamentId}`)
@@ -285,6 +287,21 @@ export default function AdminPage() {
                   className="input-field"
                   required
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Mesas Disponibles</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  value={newTournament.tables}
+                  onChange={e => setNewTournament({ ...newTournament, tables: e.target.value })}
+                  className="input-field"
+                  required
+                />
+                <p className="text-[10px] text-muted-foreground mt-1 px-1 italic">
+                  * Este dato se guarda solo en este navegador (no afecta la base de datos)
+                </p>
               </div>
               {formError && (
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
