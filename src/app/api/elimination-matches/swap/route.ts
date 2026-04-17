@@ -31,56 +31,41 @@ export async function POST(request: NextRequest) {
     const playerAId = slotA === 'p1' ? matchA.player1_id : matchA.player2_id
     const playerBId = slotB === 'p1' ? matchB.player1_id : matchB.player2_id
 
-    // 3. Swap in memory for Match A
-    const newMatchA = { ...matchA }
-    if (slotA === 'p1') newMatchA.player1_id = playerBId
-    else newMatchA.player2_id = playerBId
-
-    // Swap in memory for Match B
-    const newMatchB = { ...matchB }
-    if (slotB === 'p1') newMatchB.player1_id = playerAId
-    else newMatchB.player2_id = playerAId
-
-    // 4. Update BYE status
-    newMatchA.bye = !newMatchA.player1_id || !newMatchA.player2_id
-    newMatchB.bye = !newMatchB.player1_id || !newMatchB.player2_id
-
-    // Update Winner for Match A if BYE
-    if (newMatchA.bye) {
-      newMatchA.winner_id = newMatchA.player1_id || newMatchA.player2_id
-    } else {
-      newMatchA.winner_id = null
+    // 3. Swap in memory
+    const updates: Record<number, any> = {
+      [matchAId]: { ...matchA }
+    }
+    if (matchBId !== matchAId) {
+      updates[matchBId] = { ...matchB }
     }
 
-    // Update Winner for Match B if BYE
-    if (newMatchB.bye) {
-      newMatchB.winner_id = newMatchB.player1_id || newMatchB.player2_id
-    } else {
-      newMatchB.winner_id = null
-    }
+    // Apply swaps
+    if (slotA === 'p1') updates[matchAId].player1_id = playerBId
+    else updates[matchAId].player2_id = playerBId
 
-    // 5. Save to DB
-    await pool.query(
-      'UPDATE elimination_matches SET player1_id = $1, player2_id = $2, bye = $3, winner_id = $4 WHERE id = $5',
-      [newMatchA.player1_id, newMatchA.player2_id, newMatchA.bye, newMatchA.winner_id, matchAId]
-    )
-    await pool.query(
-      'UPDATE elimination_matches SET player1_id = $1, player2_id = $2, bye = $3, winner_id = $4 WHERE id = $5',
-      [newMatchB.player1_id, newMatchB.player2_id, newMatchB.bye, newMatchB.winner_id, matchBId]
-    )
+    if (slotB === 'p1') updates[matchBId].player1_id = playerAId
+    else updates[matchBId].player2_id = playerAId
 
-    // 6. Advance winners if they were BYEs
-    if (newMatchA.winner_id) {
-      await advanceWinner(categoryId, newMatchA.round, newMatchA.match_number, newMatchA.winner_id)
-    } else {
-      // Clear winner in next round if it was a BYE before
-      await clearWinnerInNextRound(categoryId, newMatchA.round, newMatchA.match_number)
-    }
+    // 4. Update statuses and Save to DB
+    for (const mIdStr of Object.keys(updates)) {
+      const mId = parseInt(mIdStr)
+      const m = updates[mId]
+      
+      m.bye = !m.player1_id || !m.player2_id
+      m.winner_id = m.bye ? (m.player1_id || m.player2_id) : null
 
-    if (newMatchB.winner_id) {
-      await advanceWinner(categoryId, newMatchB.round, newMatchB.match_number, newMatchB.winner_id)
-    } else {
-      await clearWinnerInNextRound(categoryId, newMatchB.round, newMatchB.match_number)
+      await pool.query(
+        'UPDATE elimination_matches SET player1_id = $1, player2_id = $2, bye = $3, winner_id = $4 WHERE id = $5',
+        [m.player1_id, m.player2_id, m.bye, m.winner_id, mId]
+      )
+
+      // 5. Advance winners if they were BYEs
+      if (m.winner_id) {
+        await advanceWinner(categoryId, m.round, m.match_number, m.winner_id)
+      } else {
+        // Clear winner in next round if it was a BYE before
+        await clearWinnerInNextRound(categoryId, m.round, m.match_number)
+      }
     }
 
     const updatedMatches = await pool.query(`

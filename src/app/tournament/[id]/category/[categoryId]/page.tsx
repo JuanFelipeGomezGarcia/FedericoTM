@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
 import { ArrowLeft } from 'lucide-react'
+import { generateBergerSchedule } from '@/lib/berger'
 
 interface Category {
   id: number
@@ -262,7 +263,7 @@ export default function CategoryPage() {
     const next = [...tiebreakOrder]
     const swap = idx + dir
     if (swap < 0 || swap >= next.length) return
-    ;[next[idx], next[swap]] = [next[swap], next[idx]]
+      ;[next[idx], next[swap]] = [next[swap], next[idx]]
     setTiebreakOrder(next)
   }
 
@@ -291,7 +292,7 @@ export default function CategoryPage() {
     matches.find(m =>
       m.group_id === groupId &&
       ((Number(m.player1_id) === Number(p1Id) && Number(m.player2_id) === Number(p2Id)) ||
-       (Number(m.player1_id) === Number(p2Id) && Number(m.player2_id) === Number(p1Id)))
+        (Number(m.player1_id) === Number(p2Id) && Number(m.player2_id) === Number(p1Id)))
     )
 
   const displayResult = (match: Match, rowPlayerId: number): string => {
@@ -308,13 +309,13 @@ export default function CategoryPage() {
       <header className="page-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <Link href="/">
-              <Image 
-                src="/assets/LogoSinFondo.png" 
-                alt="Federico TM Logo" 
-                width={140} 
-                height={40} 
-                className="object-contain" 
+            <Link href={isAdmin ? "/admin" : "/"}>
+              <Image
+                src="/assets/LogoSinFondo.png"
+                alt="Federico TM Logo"
+                width={140}
+                height={40}
+                className="object-contain"
                 priority
               />
             </Link>
@@ -364,287 +365,350 @@ export default function CategoryPage() {
           const doneMatches = gMatches.filter(m => m.result).length
 
           return (
-            <div key={group.id} className="space-y-4">
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <h2 className="text-xl font-bold text-foreground">
-                  {group.name}
-                  <span className="ml-3 text-sm font-normal text-muted-foreground">
-                    {doneMatches}/{totalMatches} partidos completados
-                  </span>
-                </h2>
-                {isAdmin && !category.is_finished && (
-                  <button
-                    onClick={() => { setNewPlayerGroup(group.id); setNewPlayerName('') }}
-                    className="btn-secondary text-xs px-3 py-1.5"
-                  >
-                    + Jugador
-                  </button>
-                )}
-              </div>
-
-              {/* ── Panel agregar jugador ── */}
-              {isAdmin && newPlayerGroup === group.id && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary border border-border">
-                  <input
-                    autoFocus
-                    className="input-field flex-1 py-1.5 text-sm"
-                    placeholder="Nombre del jugador"
-                    value={newPlayerName}
-                    onChange={e => setNewPlayerName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') addPlayer(group.id)
-                      if (e.key === 'Escape') setNewPlayerGroup(null)
-                    }}
-                  />
-                  <button
-                    onClick={() => addPlayer(group.id)}
-                    disabled={playerActionLoading || !newPlayerName.trim()}
-                    className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50"
-                  >
-                    {playerActionLoading ? '...' : 'Agregar'}
-                  </button>
-                  <button onClick={() => setNewPlayerGroup(null)} className="btn-secondary text-xs px-3 py-1.5">
-                    Cancelar
-                  </button>
+            <Card key={group.id} className="border-border/60 bg-card/20 overflow-hidden shadow-xl mb-12">
+              <CardHeader className="bg-secondary/10 border-b border-border/40 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-600 to-cyan-400 flex items-center justify-center text-black font-black shadow-lg shadow-cyan-500/20">
+                      {group.name.split(' ')[1] || group.name[0]}
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground leading-none mb-1">{group.name}</h2>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                        {doneMatches}/{totalMatches} partidos completados
+                      </p>
+                    </div>
+                  </div>
+                  {isAdmin && !category.is_finished && (
+                    <button
+                      onClick={() => { setNewPlayerGroup(group.id); setNewPlayerName('') }}
+                      className="btn-secondary text-[10px] px-3 py-1 uppercase tracking-wider font-bold"
+                    >
+                      + Jugador
+                    </button>
+                  )}
                 </div>
-              )}
+              </CardHeader>
 
-              {/* ── Lista de jugadores editable (solo admin) ── */}
-              {isAdmin && !category.is_finished && players.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Jugadores del grupo</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-1">
-                      {players.map(p => (
-                        <li key={p.id} className="flex items-center gap-2">
-                          {editingPlayer?.id === p.id ? (
-                            <>
-                              <input
-                                autoFocus
-                                className="input-field flex-1 py-1 text-sm"
-                                value={editingPlayer.name}
-                                onChange={e => setEditingPlayer({ id: p.id, name: e.target.value })}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') renamePlayer(p.id, editingPlayer.name)
-                                  if (e.key === 'Escape') setEditingPlayer(null)
-                                }}
-                              />
-                              <button
-                                onMouseDown={e => { e.preventDefault(); renamePlayer(p.id, editingPlayer.name) }}
-                                disabled={playerActionLoading}
-                                className="text-xs px-2 py-1 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400 disabled:opacity-50"
-                              >✓</button>
-                              <button
-                                onMouseDown={e => { e.preventDefault(); setEditingPlayer(null) }}
-                                className="text-xs px-2 py-1 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground"
-                              >✕</button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="flex-1 text-sm text-foreground">{p.name}</span>
-                              <button
-                                onClick={() => setEditingPlayer({ id: p.id, name: p.name })}
-                                className="text-xs text-muted-foreground hover:text-cyan-400 px-2 py-1 rounded hover:bg-secondary transition-colors"
-                              >✏️</button>
-                              <button
-                                onClick={() => deletePlayer(p.id, group.id)}
-                                disabled={playerActionLoading}
-                                className="text-xs text-muted-foreground hover:text-red-400 px-2 py-1 rounded hover:bg-secondary transition-colors disabled:opacity-50"
-                              >🗑️</button>
-                            </>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              )}
+              <CardContent className="p-6 space-y-8">
+                {/* ── Panel agregar jugador ── */}
+                {isAdmin && newPlayerGroup === group.id && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary border border-border animate-in slide-in-from-top-2 duration-300">
+                    <input
+                      autoFocus
+                      className="input-field flex-1 py-1.5 text-sm"
+                      placeholder="Nombre del jugador"
+                      value={newPlayerName}
+                      onChange={e => setNewPlayerName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') addPlayer(group.id)
+                        if (e.key === 'Escape') setNewPlayerGroup(null)
+                      }}
+                    />
+                    <button
+                      onClick={() => addPlayer(group.id)}
+                      disabled={playerActionLoading || !newPlayerName.trim()}
+                      className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50"
+                    >
+                      {playerActionLoading ? '...' : 'Agregar'}
+                    </button>
+                    <button onClick={() => setNewPlayerGroup(null)} className="btn-secondary text-xs px-3 py-1.5">
+                      Cancelar
+                    </button>
+                  </div>
+                )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                <div className="space-y-4">
-                  {/* ── Tabla cruzada ── */}
-                  {players.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Tabla de Resultados</CardTitle>
-                  </CardHeader>
-                  <CardContent className="overflow-x-auto">
-                    <table className="text-sm border-collapse w-full">
-                      <thead>
-                        <tr>
-                          <th className="border border-border bg-secondary text-foreground px-3 py-2 text-left min-w-[140px]">
-                            Jugador
-                          </th>
-                          {players.map(p => (
-                            <th
-                              key={p.id}
-                              className="border border-border bg-secondary text-foreground px-2 py-2 text-center min-w-[70px] text-xs"
-                            >
-                              {p.name.split(' ')[0]}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {players.map(rowPlayer => (
-                          <tr key={rowPlayer.id}>
-                            <td className="border border-border px-3 py-2 font-medium text-foreground bg-secondary/50">
-                              {rowPlayer.name}
-                            </td>
-                            {players.map(colPlayer => {
-                              if (rowPlayer.id === colPlayer.id) {
-                                return (
-                                  <td
-                                    key={colPlayer.id}
-                                    className="border border-border bg-secondary/80"
-                                  />
-                                )
-                              }
-                              const match = getResult(group.id, rowPlayer.id, colPlayer.id)
-                              if (!match) {
-                                return (
-                                  <td key={colPlayer.id} className="border border-border text-center text-muted-foreground text-xs py-2">
-                                    —
+                {/* ── Lista de jugadores editable (solo admin) ── */}
+                {isAdmin && !category.is_finished && players.length > 0 && (
+                  <Card className="border-border/40 bg-background/80 shadow-xl shadow-black/20 ring-1 ring-white/5">
+                    <CardHeader className="py-3 border-b border-border/10">
+                      <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-tight">Jugadores del grupo</CardTitle>
+                    </CardHeader>
+                    <CardContent className="py-4">
+                      <ul className="space-y-1">
+                        {players.map(p => (
+                          <li key={p.id} className="flex items-center gap-2">
+                            {editingPlayer?.id === p.id ? (
+                              <>
+                                <input
+                                  autoFocus
+                                  className="input-field flex-1 py-1 text-sm"
+                                  value={editingPlayer.name}
+                                  onChange={e => setEditingPlayer({ id: p.id, name: e.target.value })}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') renamePlayer(p.id, editingPlayer.name)
+                                    if (e.key === 'Escape') setEditingPlayer(null)
+                                  }}
+                                />
+                                <button
+                                  onMouseDown={e => { e.preventDefault(); renamePlayer(p.id, editingPlayer.name) }}
+                                  disabled={playerActionLoading}
+                                  className="text-xs px-2 py-1 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400 disabled:opacity-50"
+                                >✓</button>
+                                <button
+                                  onMouseDown={e => { e.preventDefault(); setEditingPlayer(null) }}
+                                  className="text-xs px-2 py-1 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground"
+                                >✕</button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="flex-1 text-sm text-foreground">{p.name}</span>
+                                <button
+                                  onClick={() => setEditingPlayer({ id: p.id, name: p.name })}
+                                  className="text-xs text-muted-foreground hover:text-cyan-400 px-2 py-1 rounded hover:bg-secondary transition-colors"
+                                >✏️</button>
+                                <button
+                                  onClick={() => deletePlayer(p.id, group.id)}
+                                  disabled={playerActionLoading}
+                                  className="text-xs text-muted-foreground hover:text-red-400 px-2 py-1 rounded hover:bg-secondary transition-colors disabled:opacity-50"
+                                >🗑️</button>
+                              </>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* ── Tablas Principales (Alturas Igualadas) ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+                  <div className="flex flex-col group/card">
+                    {players.length > 0 && (
+                      <Card className="h-full flex flex-col border-border/50 bg-background/90 shadow-2xl shadow-black/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-cyan-500/10 ring-1 ring-white/5">
+                        <CardHeader className="py-4 px-5 border-b border-border/20 bg-secondary/5">
+                          <CardTitle className="text-sm font-bold text-muted-foreground">Tabla de Resultados</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 overflow-x-auto p-5">
+                          <table className="text-sm border-collapse w-full">
+                            <thead>
+                              <tr>
+                                <th className="border border-border bg-secondary text-foreground px-3 py-2 text-left min-w-[140px]">
+                                  Jugador
+                                </th>
+                                {players.map(p => (
+                                  <th
+                                    key={p.id}
+                                    className="border border-border bg-secondary text-foreground px-2 py-2 text-center min-w-[70px] text-xs"
+                                  >
+                                    {p.name.split(' ')[0]}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {players.map(rowPlayer => (
+                                <tr key={rowPlayer.id}>
+                                  <td className="border border-border px-3 py-2 font-medium text-foreground bg-secondary/50">
+                                    {rowPlayer.name}
                                   </td>
-                                )
-                              }
-                              const isEditing = editingCell?.matchId === match.id && editingCell?.rowPlayerId === rowPlayer.id
-                              const hasError = cellError?.matchId === match.id
-                              const resultDisplay = displayResult(match, rowPlayer.id)
+                                  {players.map(colPlayer => {
+                                    if (rowPlayer.id === colPlayer.id) {
+                                      return (
+                                        <td
+                                          key={colPlayer.id}
+                                          className="border border-border bg-secondary/80"
+                                        />
+                                      )
+                                    }
+                                    const match = getResult(group.id, rowPlayer.id, colPlayer.id)
+                                    if (!match) {
+                                      return (
+                                        <td key={colPlayer.id} className="border border-border text-center text-muted-foreground text-xs py-2">
+                                          —
+                                        </td>
+                                      )
+                                    }
+                                    const isEditing = editingCell?.matchId === match.id && editingCell?.rowPlayerId === rowPlayer.id
+                                    const hasError = cellError?.matchId === match.id
+                                    const resultDisplay = displayResult(match, rowPlayer.id)
+
+                                    return (
+                                      <td
+                                        key={colPlayer.id}
+                                        className="border border-border text-center p-1"
+                                      >
+                                        {isEditing ? (
+                                          <div className="flex flex-col items-center gap-1">
+                                            <input
+                                              autoFocus
+                                              className="match-input w-16"
+                                              value={editingCell.value}
+                                              placeholder="3-1"
+                                              onChange={e => setEditingCell({ matchId: match.id, rowPlayerId: rowPlayer.id, value: e.target.value })}
+                                              onKeyDown={e => {
+                                                if (e.key === 'Enter') commitEdit(match.id)
+                                                if (e.key === 'Escape') { setEditingCell(null); setCellError(null) }
+                                              }}
+                                            />
+                                            <div className="flex gap-1">
+                                              <button
+                                                onMouseDown={e => { e.preventDefault(); commitEdit(match.id) }}
+                                                className="text-xs px-2 py-0.5 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400"
+                                              >✓</button>
+                                              <button
+                                                onMouseDown={e => { e.preventDefault(); setEditingCell(null); setCellError(null) }}
+                                                className="text-xs px-2 py-0.5 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground"
+                                              >✕</button>
+                                            </div>
+                                            {hasError && (
+                                              <span className="text-red-400 text-xs">{cellError.msg}</span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <button
+                                            onClick={() => startEdit(match, rowPlayer.id)}
+                                            disabled={!!category.is_finished || !isAdmin}
+                                            className={`w-full py-2 px-2 rounded text-xs font-mono transition-all border ${resultDisplay
+                                                ? 'text-foreground border-border hover:border-cyan-500/50 hover:bg-cyan-500/10'
+                                                : isAdmin
+                                                  ? 'text-muted-foreground border-dashed border-border/50 hover:border-cyan-500/50 hover:text-cyan-400'
+                                                  : 'text-muted-foreground/40 border-transparent'
+                                              } ${savingId === match.id ? 'opacity-50' : ''} ${isAdmin && !category.is_finished ? 'cursor-pointer' : 'cursor-default'}`}
+                                          >
+                                            {savingId === match.id ? '...' : resultDisplay || (isAdmin ? '+' : '—')}
+                                          </button>
+                                        )}
+                                      </td>
+                                    )
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {!category.is_finished && isAdmin && (
+                            <p className="text-xs text-muted-foreground mt-2 text-center italic">
+                              Haz clic en una celda para ingresar el resultado (formato: 3-1).
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col group/card">
+                    {gStandings.length > 0 && (
+                      <Card className="h-full flex flex-col border-border/50 bg-background/90 shadow-2xl shadow-black/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-cyan-500/10 ring-1 ring-white/5">
+                        <CardHeader className="py-4 px-5 border-b border-border/20 bg-secondary/5 flex flex-row items-center justify-between space-y-0 text-foreground">
+                          <CardTitle className="text-sm font-bold text-muted-foreground">Posiciones</CardTitle>
+                          {!category.is_finished && isAdmin && (
+                            <button
+                              className="text-[10px] bg-secondary border border-border hover:text-cyan-400 px-3 py-1 rounded transition-all"
+                              onClick={() => openTiebreak(group.id)}
+                            >
+                              Manual
+                            </button>
+                          )}
+                        </CardHeader>
+                        <CardContent className="flex-1 overflow-x-auto p-5">
+                          <table className="text-sm w-full border-collapse">
+                            <thead>
+                              <tr className="bg-secondary">
+                                <th className="border border-border px-3 py-2 text-center text-foreground w-10">#</th>
+                                <th className="border border-border px-3 py-2 text-left text-foreground">Jugador</th>
+                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">PJ</th>
+                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">G</th>
+                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">P</th>
+                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">SF</th>
+                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">SC</th>
+                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">Dif</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {gStandings.map((s, idx) => (
+                                <tr
+                                  key={s.id}
+                                  className={`${idx < category.qualified_per_group ? 'bg-emerald-500/10' : ''} hover:bg-white/5 transition-colors`}
+                                >
+                                  <td className="border border-border px-3 py-2 text-center font-bold text-foreground">
+                                    {idx + 1}
+                                  </td>
+                                  <td className="border border-border px-3 py-2 font-medium text-foreground">
+                                    {s.name}
+                                    {s.manualTiebreak !== null && (
+                                      <span className="ml-1 text-xs text-warning">(M)</span>
+                                    )}
+                                  </td>
+                                  <td className="border border-border px-2 py-2 text-center text-foreground">{s.played}</td>
+                                  <td className="border border-border px-2 py-2 text-center text-emerald-400 font-semibold">{s.wins}</td>
+                                  <td className="border border-border px-2 py-2 text-center text-red-400">{s.losses}</td>
+                                  <td className="border border-border px-2 py-2 text-center text-foreground">{s.setsWon}</td>
+                                  <td className="border border-border px-2 py-2 text-center text-foreground">{s.setsLost}</td>
+                                  <td className="border border-border px-2 py-2 text-center font-mono text-foreground font-bold">
+                                    {s.setDiff > 0 ? `+${s.setDiff}` : s.setDiff}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <div className="mt-4 flex items-center gap-2 text-[10px] text-muted-foreground italic">
+                            Fondo verde = clasificados ({category.qualified_per_group} por grupo)
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Secuencia de Partidos (Pie de la Tarjeta Madre) ── */}
+                {players.length > 0 && (
+                  <div className="pt-8 border-t border-border/40">
+                    <div className="flex items-center justify-between mb-5 px-2">
+                      <h4 className="text-[11px] uppercase tracking-[0.3em] text-cyan-400 font-black flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)]" />
+                        Secuencia de Juego
+                      </h4>
+                      <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-medium">
+                        <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-border" /> Pendiente</span>
+                        <span className="flex items-center gap-1.5 text-emerald-500"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Jugado</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {generateBergerSchedule(players.length).map((round) => (
+                        <div key={round.round} className="bg-secondary/10 rounded-lg p-3 border border-border/20">
+                          <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-white/5">
+                            <span className="text-[10px] font-black text-cyan-500 bg-cyan-500/10 px-1.5 py-0.5 rounded">S{round.round}</span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {round.matches.map((m, idx) => {
+                              const p1 = players[m.p1Idx];
+                              const p2 = players[m.p2Idx];
+                              const matchObj = getResult(group.id, p1.id, p2.id);
+                              const isDone = !!matchObj?.result;
 
                               return (
-                                <td
-                                  key={colPlayer.id}
-                                  className="border border-border text-center p-1"
-                                >
-                                  {isEditing ? (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <input
-                                        autoFocus
-                                        className="match-input w-16"
-                                        value={editingCell.value}
-                                        placeholder="3-1"
-                                        onChange={e => setEditingCell({ matchId: match.id, rowPlayerId: rowPlayer.id, value: e.target.value })}
-                                        onKeyDown={e => {
-                                          if (e.key === 'Enter') commitEdit(match.id)
-                                          if (e.key === 'Escape') { setEditingCell(null); setCellError(null) }
-                                        }}
-                                      />
-                                      <div className="flex gap-1">
-                                        <button
-                                          onMouseDown={e => { e.preventDefault(); commitEdit(match.id) }}
-                                          className="text-xs px-2 py-0.5 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400"
-                                        >✓</button>
-                                        <button
-                                          onMouseDown={e => { e.preventDefault(); setEditingCell(null); setCellError(null) }}
-                                          className="text-xs px-2 py-0.5 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground"
-                                        >✕</button>
-                                      </div>
-                                      {hasError && (
-                                        <span className="text-red-400 text-xs">{cellError.msg}</span>
-                                      )}
+                                <div key={idx} className={`flex items-center justify-between gap-3 py-2 px-3 rounded-md transition-colors ${isDone ? 'bg-emerald-500/10' : 'bg-white/5 shadow-sm'}`}>
+                                  <div className="flex items-center gap-2.5 flex-1 overflow-hidden text-xs">
+                                    <span className="text-[10px] font-black text-cyan-500/60 shrink-0 tabular-nums bg-cyan-500/10 px-1.5 py-0.5 rounded leading-none">
+                                      {m.p1Idx + 1}-{m.p2Idx + 1}
+                                    </span>
+                                    <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                                      <span className={`truncate font-bold tracking-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
+                                        {p1.name}
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground/30 font-black shrink-0 italic">vs</span>
+                                      <span className={`truncate font-bold tracking-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
+                                        {p2.name}
+                                      </span>
                                     </div>
-                                  ) : (
-                                    <button
-                                      onClick={() => startEdit(match, rowPlayer.id)}
-                                      disabled={!!category.is_finished || !isAdmin}
-                                      className={`w-full py-2 px-2 rounded text-xs font-mono transition-all border ${
-                                        resultDisplay
-                                          ? 'text-foreground border-border hover:border-cyan-500/50 hover:bg-cyan-500/10'
-                                          : isAdmin
-                                            ? 'text-muted-foreground border-dashed border-border/50 hover:border-cyan-500/50 hover:text-cyan-400'
-                                            : 'text-muted-foreground/40 border-transparent'
-                                      } ${savingId === match.id ? 'opacity-50' : ''} ${isAdmin && !category.is_finished ? 'cursor-pointer' : 'cursor-default'}`}
-                                    >
-                                      {savingId === match.id ? '...' : resultDisplay || (isAdmin ? '+' : '—')}
-                                    </button>
+                                  </div>
+                                  {isDone && (
+                                    <div className="flex items-center justify-center shrink-0">
+                                      <span className="text-xs text-emerald-500 font-black">✓</span>
+                                    </div>
                                   )}
-                                </td>
-                              )
+                                </div>
+                              );
                             })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {!category.is_finished && isAdmin && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Haz clic en una celda para ingresar el resultado (formato: 3-1). El resultado es desde la perspectiva del jugador de la fila.
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-                </div>
-
-                <div className="space-y-4">
-                  {/* ── Tabla de posiciones ── */}
-                  {gStandings.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <CardTitle className="text-base">Posiciones</CardTitle>
-                      {!category.is_finished && isAdmin && (
-                        <button
-                          className="btn-secondary text-xs px-3 py-1.5"
-                          onClick={() => openTiebreak(group.id)}
-                        >
-                          Desempate Manual
-                        </button>
-                      )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </CardHeader>
-                  <CardContent className="overflow-x-auto">
-                    <table className="text-sm w-full border-collapse">
-                      <thead>
-                        <tr className="bg-secondary">
-                          <th className="border border-border px-3 py-2 text-center text-foreground w-10">#</th>
-                          <th className="border border-border px-3 py-2 text-left text-foreground">Jugador</th>
-                          <th className="border border-border px-2 py-2 text-center text-muted-foreground">PJ</th>
-                          <th className="border border-border px-2 py-2 text-center text-muted-foreground">G</th>
-                          <th className="border border-border px-2 py-2 text-center text-muted-foreground">P</th>
-                          <th className="border border-border px-2 py-2 text-center text-muted-foreground">SF</th>
-                          <th className="border border-border px-2 py-2 text-center text-muted-foreground">SC</th>
-                          <th className="border border-border px-2 py-2 text-center text-muted-foreground">Dif</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {gStandings.map((s, idx) => (
-                          <tr
-                            key={s.id}
-                            className={idx < category.qualified_per_group ? 'bg-emerald-500/10' : ''}
-                          >
-                            <td className="border border-border px-3 py-2 text-center font-bold text-foreground">
-                              {idx + 1}
-                            </td>
-                            <td className="border border-border px-3 py-2 font-medium text-foreground">
-                              {s.name}
-                              {s.manualTiebreak !== null && (
-                                <span className="ml-1 text-xs text-warning">(M)</span>
-                              )}
-                            </td>
-                            <td className="border border-border px-2 py-2 text-center text-foreground">{s.played}</td>
-                            <td className="border border-border px-2 py-2 text-center text-emerald-400 font-semibold">{s.wins}</td>
-                            <td className="border border-border px-2 py-2 text-center text-red-400">{s.losses}</td>
-                            <td className="border border-border px-2 py-2 text-center text-foreground">{s.setsWon}</td>
-                            <td className="border border-border px-2 py-2 text-center text-foreground">{s.setsLost}</td>
-                            <td className="border border-border px-2 py-2 text-center font-mono text-foreground">
-                              {s.setDiff > 0 ? `+${s.setDiff}` : s.setDiff}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Fondo verde = clasificados ({category.qualified_per_group} por grupo)
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-                </div>
-              </div>
-            </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )
         })}
 

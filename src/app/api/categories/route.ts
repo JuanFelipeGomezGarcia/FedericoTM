@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
+import { generateBergerSchedule } from '@/lib/berger'
+
 export async function POST(request: NextRequest) {
   try {
     const { tournament_id, name, players_per_group, qualified_per_group, players } = await request.json()
@@ -80,7 +82,7 @@ export async function POST(request: NextRequest) {
     )
     await Promise.all(gpInserts)
 
-    // Auto-generate round robin matches for each group
+    // Auto-generate round robin matches for each group using Berger System
     for (const groupId of groupIds) {
       const playersResult = await pool.query(`
         SELECT p.* FROM players p
@@ -88,12 +90,19 @@ export async function POST(request: NextRequest) {
         WHERE gp.group_id = $1 ORDER BY gp.position
       `, [groupId])
       const groupPlayersList = playersResult.rows
-      const rMatches = generateRoundRobinMatches(groupPlayersList)
-      for (const match of rMatches) {
-        await pool.query(
-          'INSERT INTO round_robin_matches (category_id, group_id, player1_id, player2_id) VALUES ($1, $2, $3, $4)',
-          [category.id, groupId, match.player1.id, match.player2.id]
-        )
+      
+      const schedule = generateBergerSchedule(groupPlayersList.length)
+      
+      for (const round of schedule) {
+        for (const matchIdx of round.matches) {
+          const p1 = groupPlayersList[matchIdx.p1Idx]
+          const p2 = groupPlayersList[matchIdx.p2Idx]
+          
+          await pool.query(
+            'INSERT INTO round_robin_matches (category_id, group_id, player1_id, player2_id) VALUES ($1, $2, $3, $4)',
+            [category.id, groupId, p1.id, p2.id]
+          )
+        }
       }
     }
 
@@ -102,14 +111,4 @@ export async function POST(request: NextRequest) {
     console.error(error)
     return NextResponse.json({ error: 'Error creating category' }, { status: 500 })
   }
-}
-
-function generateRoundRobinMatches(players: any[]) {
-  const matches: { player1: any; player2: any }[] = []
-  for (let i = 0; i < players.length; i++) {
-    for (let j = i + 1; j < players.length; j++) {
-      matches.push({ player1: players[i], player2: players[j] })
-    }
-  }
-  return matches
 }
