@@ -66,9 +66,9 @@ export default function CategoryPage() {
   const [savingId, setSavingId] = useState<number | null>(null)
   const [cellError, setCellError] = useState<{ matchId: number; msg: string } | null>(null)
   
-  // Tables logic
+  // Tables logic (BD-backed)
   const [tablesCount, setTablesCount] = useState<number>(0)
-  const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { categoryId, groupId, matchId, p1Name, p2Name }
+  const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { ... }
 
   // Tiebreak panel
   const [tiebreakGroup, setTiebreakGroup] = useState<number | null>(null)
@@ -162,74 +162,78 @@ export default function CategoryPage() {
 
   useEffect(() => {
     setIsAdmin(!!localStorage.getItem('admin-token'))
-    
-    // Load tables config
-    const count = parseInt(localStorage.getItem(`tournament_${tournamentId}_tables_count`) || '0')
-    setTablesCount(count)
-    
-    // Load current assignments
-    const saved = localStorage.getItem(`tournament_${tournamentId}_table_assignments`)
-    if (saved) {
-      try {
-        setTableAssignments(JSON.parse(saved))
-      } catch (e) {
-        console.error("Error loading table assignments", e)
+  }, [])
+
+  // Fetch tables from DB (polling cada 5s para tiempo real)
+  const fetchTables = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tables?tournamentId=${tournamentId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setTablesCount(data.tablesCount ?? 0)
+        setTableAssignments(data.assignments ?? {})
       }
+    } catch (e) {
+      console.error('Error fetching tables', e)
     }
   }, [tournamentId])
 
-  // Sync tables across tabs
+  const toggleTableManual = async (tableNumber: number) => {
+    const token = localStorage.getItem('admin-token')
+    if (!token) return
+    const isOccupied = !!tableAssignments[tableNumber]
+    await fetch('/api/tables', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ tournamentId, tableNumber, occupied: !isOccupied, label: 'Ocupada' })
+    })
+    fetchTables()
+  }
+
   useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === `tournament_${tournamentId}_table_assignments`) {
-        if (e.newValue) setTableAssignments(JSON.parse(e.newValue))
-      }
-    }
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
-  }, [tournamentId])
+    fetchTables()
+    const interval = setInterval(fetchTables, 5000)
+    return () => clearInterval(interval)
+  }, [fetchTables])
 
-  const saveTableAssignments = (newAssignments: Record<number, any>) => {
-    setTableAssignments(newAssignments)
-    localStorage.setItem(`tournament_${tournamentId}_table_assignments`, JSON.stringify(newAssignments))
+  const assignTable = async (tableNumber: number, match: Match, groupName: string) => {
+    const token = localStorage.getItem('admin-token')
+    if (!token) return
+    if (tableNumber <= 0) {
+      // Liberar la mesa donde estaba este partido
+      await fetch(`/api/tables?tournamentId=${tournamentId}&matchId=${match.id}&matchType=round-robin`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+    } else {
+      await fetch('/api/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          tournamentId,
+          tableNumber,
+          categoryId,
+          categoryName: category?.name,
+          groupId: match.group_id,
+          groupName,
+          matchId: match.id,
+          matchType: 'round-robin',
+          p1Name: match.player1_name,
+          p2Name: match.player2_name
+        })
+      })
+    }
+    fetchTables()
   }
 
-  const assignTable = (tableNumber: number, match: Match, groupName: string) => {
-    const newAssignments = { ...tableAssignments }
-    
-    // If this match was already on another table, remove it from there
-    Object.keys(newAssignments).forEach(num => {
-      if (newAssignments[parseInt(num)].matchId === match.id) {
-        delete newAssignments[parseInt(num)]
-      }
+  const releaseTable = async (matchId: number) => {
+    const token = localStorage.getItem('admin-token')
+    if (!token) return
+    await fetch(`/api/tables?tournamentId=${tournamentId}&matchId=${matchId}&matchType=round-robin`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
     })
-
-    if (tableNumber > 0) {
-      newAssignments[tableNumber] = {
-        categoryId,
-        categoryName: category?.name,
-        groupId: match.group_id,
-        groupName,
-        matchId: match.id,
-        p1Name: match.player1_name,
-        p2Name: match.player2_name,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    }
-    
-    saveTableAssignments(newAssignments)
-  }
-
-  const releaseTable = (matchId: number) => {
-    const newAssignments = { ...tableAssignments }
-    let changed = false
-    Object.keys(newAssignments).forEach(num => {
-      if (newAssignments[parseInt(num)].matchId === matchId) {
-        delete newAssignments[parseInt(num)]
-        changed = true
-      }
-    })
-    if (changed) saveTableAssignments(newAssignments)
+    fetchTables()
   }
 
   const startEdit = (match: Match, rowPlayerId: number) => {
@@ -451,47 +455,50 @@ export default function CategoryPage() {
                 <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
               </div>
               <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Control de Mesas</h3>
+              {isAdmin && <span className="text-[10px] text-muted-foreground italic">(toca para cambiar estado)</span>}
             </div>
-            
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
               {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => {
                 const assignment = tableAssignments[num]
                 const isOccupied = !!assignment
-                
+                const isManual = assignment?.matchType === 'manual'
                 return (
-                  <div key={num} className={cn(
-                    "border rounded-xl p-3 flex flex-col items-center justify-center gap-1 transition-all",
-                    isOccupied ? 'bg-rose-500/5 border-rose-500/30' : 'bg-emerald-500/5 border-emerald-500/10'
-                  )}>
+                  <button
+                    key={num}
+                    onClick={() => isAdmin && toggleTableManual(num)}
+                    className={cn(
+                      'border rounded-xl p-3 flex flex-col items-center justify-center gap-1 transition-all duration-300 w-full',
+                      isAdmin ? 'cursor-pointer hover:scale-105 active:scale-95' : 'cursor-default',
+                      isOccupied ? 'bg-rose-500/5 border-rose-500/30 hover:bg-rose-500/15' : 'bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/10'
+                    )}
+                  >
                     <span className={cn(
-                      "text-[9px] font-black px-2 py-0.5 rounded-full mb-1",
+                      'text-[9px] font-black px-2 py-0.5 rounded-full mb-1',
                       isOccupied ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
                     )}>MESA {num}</span>
                     {isOccupied ? (
                       <div className="text-[10px] text-center w-full animate-in fade-in zoom-in duration-300">
-                        <div className="text-[9px] text-rose-400/70 font-bold uppercase truncate w-full mb-0.5 px-1 leading-none">
-                          {assignment.categoryName} — {assignment.groupName}
-                        </div>
-                        <div className="font-bold text-foreground truncate">{assignment.p1Name}</div>
-                        <div className="text-[8px] text-muted-foreground/40 leading-none my-0.5">VS</div>
-                        <div className="font-bold text-foreground truncate">{assignment.p2Name}</div>
-                        {isAdmin && (
-                          <button 
-                            onClick={() => {
-                              const next = {...tableAssignments};
-                              delete next[num];
-                              saveTableAssignments(next);
-                            }}
-                            className="mt-1 text-[9px] text-muted-foreground hover:text-rose-400"
-                          >
-                            Liberar
-                          </button>
+                        {!isManual && (
+                          <div className="text-[9px] text-rose-400/70 font-bold uppercase truncate w-full mb-0.5 px-1 leading-none">
+                            {assignment.categoryName} — {assignment.groupName}
+                          </div>
                         )}
+                        <div className="font-bold text-foreground truncate">{assignment.p1Name}</div>
+                        {!isManual && (
+                          <>
+                            <div className="text-[8px] text-muted-foreground/40 leading-none my-0.5">VS</div>
+                            <div className="font-bold text-foreground truncate">{assignment.p2Name}</div>
+                          </>
+                        )}
+                        {isAdmin && <span className="mt-1 text-[8px] text-rose-400/50">Toca para liberar</span>}
                       </div>
                     ) : (
-                      <span className="text-[9px] text-muted-foreground/30">Libre</span>
+                      <>
+                        <span className="text-[9px] text-emerald-400/60 font-bold">Libre</span>
+                        {isAdmin && <span className="text-[8px] text-emerald-400/40">Toca para ocupar</span>}
+                      </>
                     )}
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -840,26 +847,35 @@ export default function CategoryPage() {
                                     <div className="flex items-center justify-center shrink-0">
                                       <span className="text-xs text-emerald-500 font-black">✓</span>
                                     </div>
-                                  ) : isAdmin && tablesCount > 0 && (
+                                  ) : tablesCount > 0 && (
                                     <div className="flex items-center gap-2">
-                                      <select
-                                        className="bg-background border border-border/50 rounded px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground focus:border-cyan-500/50 outline-none cursor-pointer"
-                                        value={Object.keys(tableAssignments).find(num => tableAssignments[num].matchId === matchObj?.id) || ""}
-                                        onChange={(e) => {
-                                          if (matchObj) assignTable(parseInt(e.target.value) || 0, matchObj, group.name)
-                                        }}
-                                      >
-                                        <option value="">Mesa —</option>
-                                        {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => (
-                                          <option 
-                                            key={num} 
-                                            value={num} 
-                                            disabled={!!tableAssignments[num] && tableAssignments[num].matchId !== matchObj?.id}
-                                          >
-                                            Mesa {num} {tableAssignments[num] ? '(Ocup)' : ''}
-                                          </option>
-                                        ))}
-                                      </select>
+                                      {isAdmin ? (
+                                        <select
+                                          className="bg-background border border-border/50 rounded px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground focus:border-cyan-500/50 outline-none cursor-pointer"
+                                          value={Object.keys(tableAssignments).find(num => tableAssignments[num].matchId === matchObj?.id) || ""}
+                                          onChange={(e) => {
+                                            if (matchObj) assignTable(parseInt(e.target.value) || 0, matchObj, group.name)
+                                          }}
+                                        >
+                                          <option value="">Mesa —</option>
+                                          {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => (
+                                            <option 
+                                              key={num} 
+                                              value={num} 
+                                              disabled={!!tableAssignments[num] && tableAssignments[num].matchId !== matchObj?.id}
+                                            >
+                                              Mesa {num} {tableAssignments[num] ? '(Ocup)' : ''}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : (() => {
+                                        const tableNum = Object.keys(tableAssignments).find(num => tableAssignments[num].matchId === matchObj?.id)
+                                        return tableNum ? (
+                                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/20">
+                                            Mesa {tableNum}
+                                          </span>
+                                        ) : null
+                                      })()}
                                     </div>
                                   )}
                                 </div>

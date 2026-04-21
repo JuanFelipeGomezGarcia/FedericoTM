@@ -66,9 +66,9 @@ export default function BracketPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [newPlayerName, setNewPlayerName] = useState('')
 
-  // Tables logic
+  // Tables logic (BD-backed)
   const [tablesCount, setTablesCount] = useState<number>(0)
-  const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { categoryId, groupId, matchId, p1Name, p2Name }
+  const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { ... }
 
   // DnD Sensors
   const sensors = useSensors(
@@ -79,72 +79,65 @@ export default function BracketPage() {
 
   useEffect(() => { 
     setIsAdmin(!!localStorage.getItem('admin-token')) 
-    
-    // Load tables config
-    const count = parseInt(localStorage.getItem(`tournament_${tournamentId}_tables_count`) || '0')
-    setTablesCount(count)
-    
-    // Load current assignments
-    const saved = localStorage.getItem(`tournament_${tournamentId}_table_assignments`)
-    if (saved) {
-      try {
-        setTableAssignments(JSON.parse(saved))
-      } catch (e) {
-        console.error("Error loading table assignments", e)
+  }, [])
+
+  // Fetch tables from DB (polling cada 5s para tiempo real)
+  const fetchTables = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tables?tournamentId=${tournamentId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setTablesCount(data.tablesCount ?? 0)
+        setTableAssignments(data.assignments ?? {})
       }
+    } catch (e) {
+      console.error('Error fetching tables', e)
     }
   }, [tournamentId])
 
-  // Sync tables across tabs
   useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === `tournament_${tournamentId}_table_assignments`) {
-        if (e.newValue) setTableAssignments(JSON.parse(e.newValue))
-      }
-    }
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
-  }, [tournamentId])
+    fetchTables()
+    const interval = setInterval(fetchTables, 5000)
+    return () => clearInterval(interval)
+  }, [fetchTables])
 
-  const saveTableAssignments = (newAssignments: Record<number, any>) => {
-    setTableAssignments(newAssignments)
-    localStorage.setItem(`tournament_${tournamentId}_table_assignments`, JSON.stringify(newAssignments))
+  const assignTable = async (tableNumber: number, match: Match) => {
+    const token = localStorage.getItem('admin-token')
+    if (!token) return
+    if (tableNumber <= 0) {
+      await fetch(`/api/tables?tournamentId=${tournamentId}&matchId=${match.id}&matchType=elimination`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+    } else {
+      await fetch('/api/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          tournamentId,
+          tableNumber,
+          categoryId,
+          categoryName: null,
+          groupId: null,
+          groupName: match.round ? `Ronda ${match.round}` : null,
+          matchId: match.id,
+          matchType: 'elimination',
+          p1Name: match.player1_name || '?',
+          p2Name: match.player2_name || '?'
+        })
+      })
+    }
+    fetchTables()
   }
 
-  const assignTable = (tableNumber: number, match: Match) => {
-    const newAssignments = { ...tableAssignments }
-    
-    // If this match was already on another table, remove it from there
-    Object.keys(newAssignments).forEach(num => {
-      if (newAssignments[parseInt(num)].matchId === match.id && newAssignments[parseInt(num)].categoryId === categoryId) {
-        delete newAssignments[parseInt(num)]
-      }
+  const releaseTable = async (matchId: number) => {
+    const token = localStorage.getItem('admin-token')
+    if (!token) return
+    await fetch(`/api/tables?tournamentId=${tournamentId}&matchId=${matchId}&matchType=elimination`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
     })
-
-    if (tableNumber > 0) {
-      newAssignments[tableNumber] = {
-        categoryId,
-        matchId: match.id,
-        p1Name: match.player1_name || '?',
-        p2Name: match.player2_name || '?',
-        round: match.round,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    }
-    
-    saveTableAssignments(newAssignments)
-  }
-
-  const releaseTable = (matchId: number) => {
-    const newAssignments = { ...tableAssignments }
-    let changed = false
-    Object.keys(newAssignments).forEach(num => {
-      if (newAssignments[parseInt(num)].matchId === matchId && newAssignments[parseInt(num)].categoryId === categoryId) {
-        delete newAssignments[parseInt(num)]
-        changed = true
-      }
-    })
-    if (changed) saveTableAssignments(newAssignments)
+    fetchTables()
   }
 
   const fetchStandings = useCallback(async () => {

@@ -1,12 +1,4 @@
 {
-  "/page": "app/page.js",
-  "/tournament/[id]/category/[categoryId]/page": "app/tournament/[id]/category/[categoryId]/page.js",
-  "/tournament/[id]/page": "app/tournament/[id]/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/api/categories/[id]/route": "app/api/categories/[id]/route.js",
-  "/tournament/[id]/category/[categoryId]/bracket/page": "app/tournament/[id]/category/[categoryId]/bracket/page.js",
-  "/api/round-robin-matches/route": "app/api/round-robin-matches/route.js",
-  "/api/groups/route": "app/api/groups/route.js",
-  "/api/elimination-matches/route": "app/api/elimination-matches/route.js",
-  "/api/standings/route": "app/api/standings/route.js"
+  "/api/tables/route": "app/api/tables/route.js",
+  "/api/tournaments/route": "app/api/tournaments/route.js"
 }

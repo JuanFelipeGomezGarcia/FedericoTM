@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Trophy, Calendar, ChevronRight, ArrowLeft, Layers, Users, Award, Clock } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface Tournament {
   id: number
@@ -29,10 +30,25 @@ export default function TournamentPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [tablesCount, setTablesCount] = useState(0)
+  const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({})
+  const [togglingTable, setTogglingTable] = useState<number | null>(null)
 
   useEffect(() => {
     setIsAdmin(!!localStorage.getItem('admin-token'))
   }, [])
+
+  const fetchTables = useCallback(async () => {
+    if (!tournamentId) return
+    try {
+      const res = await fetch(`/api/tables?tournamentId=${tournamentId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setTablesCount(data.tablesCount ?? 0)
+        setTableAssignments(data.assignments ?? {})
+      }
+    } catch (e) { console.error(e) }
+  }, [tournamentId])
 
   useEffect(() => {
     if (!tournamentId) return
@@ -45,6 +61,26 @@ export default function TournamentPage() {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [tournamentId])
+
+  useEffect(() => {
+    fetchTables()
+    const interval = setInterval(fetchTables, 5000)
+    return () => clearInterval(interval)
+  }, [fetchTables])
+
+  const toggleTable = async (tableNumber: number) => {
+    const token = localStorage.getItem('admin-token')
+    if (!token) return
+    setTogglingTable(tableNumber)
+    const isOccupied = !!tableAssignments[tableNumber]
+    await fetch('/api/tables', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ tournamentId, tableNumber, occupied: !isOccupied, label: 'Ocupada' })
+    })
+    await fetchTables()
+    setTogglingTable(null)
+  }
 
   if (loading) {
     return (
@@ -121,6 +157,65 @@ export default function TournamentPage() {
               </div>
             </div>
           </div>
+
+          {/* Panel de Mesas */}
+          {tablesCount > 0 && (
+            <div className="mt-8 animate-fade-in">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                </div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Estado de Mesas</h3>
+                {isAdmin && (
+                  <span className="text-[10px] text-muted-foreground italic">(toca para cambiar estado)</span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-2">
+                {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => {
+                  const assignment = tableAssignments[num]
+                  const isOccupied = !!assignment
+                  const isManual = assignment?.matchType === 'manual'
+                  const isToggling = togglingTable === num
+
+                  return (
+                    <button
+                      key={num}
+                      onClick={() => isAdmin && toggleTable(num)}
+                      disabled={isToggling || (!isAdmin && false)}
+                      className={cn(
+                        'border rounded-xl p-2.5 flex flex-col items-center gap-1 transition-all duration-300',
+                        isAdmin ? 'cursor-pointer hover:scale-105 active:scale-95' : 'cursor-default',
+                        isOccupied
+                          ? 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20'
+                          : 'bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10',
+                        isToggling && 'opacity-50'
+                      )}
+                    >
+                      <span className={cn(
+                        'text-[9px] font-black px-1.5 py-0.5 rounded-full',
+                        isOccupied ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
+                      )}>M{num}</span>
+                      {isOccupied ? (
+                        <div className="text-center w-full">
+                          {isManual ? (
+                            <span className="text-[9px] text-rose-400/80 font-bold">Ocupada</span>
+                          ) : (
+                            <>
+                              <div className="text-[8px] text-foreground font-bold truncate w-full leading-tight">{assignment.p1Name}</div>
+                              <div className="text-[7px] text-muted-foreground/40 leading-none">vs</div>
+                              <div className="text-[8px] text-foreground font-bold truncate w-full leading-tight">{assignment.p2Name}</div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[9px] text-emerald-400/60 font-bold">Libre</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Stats */}
           <div className="flex flex-wrap gap-4 mt-8">

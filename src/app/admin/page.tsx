@@ -70,8 +70,6 @@ export default function AdminPage() {
         const data = await res.json()
         setCreatedTournamentId(data.id)
         setCreatedTournamentName(data.name)
-        // Store table configuration locally
-        localStorage.setItem(`tournament_${data.id}_tables_count`, newTournament.tables)
         setStep('add-categories')
       } else {
         setFormError('Error al crear el torneo')
@@ -300,7 +298,7 @@ export default function AdminPage() {
                   required
                 />
                 <p className="text-[10px] text-muted-foreground mt-1 px-1 italic">
-                  * Este dato se guarda solo en este navegador (no afecta la base de datos)
+                  * Número de mesas disponibles en el torneo (visible para todos los participantes)
                 </p>
               </div>
               {formError && (

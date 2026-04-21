@@ -4,7 +4,8 @@ CREATE TABLE tournaments (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   date DATE NOT NULL,
-  status VARCHAR(50) DEFAULT 'En curso' CHECK (status IN ('En curso', 'Finalizado'))
+  status VARCHAR(50) DEFAULT 'En curso' CHECK (status IN ('En curso', 'Finalizado')),
+  tables_count INTEGER DEFAULT 0
 );
 
 CREATE TABLE categories (
@@ -63,6 +64,22 @@ CREATE TABLE manual_tiebreaks (
   player_id INTEGER REFERENCES players(id) ON DELETE CASCADE,
   position INTEGER NOT NULL,
   PRIMARY KEY (group_id, player_id)
+);
+
+CREATE TABLE table_assignments (
+  id SERIAL PRIMARY KEY,
+  tournament_id INTEGER REFERENCES tournaments(id) ON DELETE CASCADE NOT NULL,
+  table_number INTEGER NOT NULL,
+  category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+  category_name VARCHAR(255),
+  group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL,
+  group_name VARCHAR(100),
+  match_id INTEGER NOT NULL,
+  match_type VARCHAR(20) DEFAULT 'round-robin' CHECK (match_type IN ('round-robin', 'elimination')),
+  p1_name VARCHAR(255),
+  p2_name VARCHAR(255),
+  assigned_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(tournament_id, table_number)
 );
 
 -- Índices para rendimiento
