@@ -190,22 +190,22 @@ export default function AdminPage() {
             ) : (
               <div className="divide-y divide-border/50">
                 {tournaments.map((t, i) => (
-                  <div key={t.id} className="flex items-center justify-between px-6 py-4 hover:bg-secondary/30 transition-colors group animate-fade-in" style={{ animationDelay: `${i * 0.04}s`, opacity: 0 }}>
-                    <div className="flex items-center gap-4 min-w-0">
+                  <div key={t.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-4 hover:bg-secondary/30 transition-colors group animate-fade-in gap-3" style={{ animationDelay: `${i * 0.04}s`, opacity: 0 }}>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
                         <Trophy className="w-4 h-4 text-cyan-400" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-foreground truncate">{t.name}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-foreground">{t.name}</div>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <Calendar className="w-3 h-3 text-muted-foreground" />
+                          <Calendar className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                           <span className="text-xs text-muted-foreground">
                             {new Date(t.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       {t.status === 'En curso' ? (
                         <span className="status-active">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />

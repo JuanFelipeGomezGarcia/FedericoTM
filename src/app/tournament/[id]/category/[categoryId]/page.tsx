@@ -828,17 +828,17 @@ export default function CategoryPage() {
                               const isDone = !!matchObj?.result;
 
                               return (
-                                <div key={idx} className={`flex items-center justify-between gap-3 py-2 px-3 rounded-md transition-colors ${isDone ? 'bg-emerald-500/10' : 'bg-white/5 shadow-sm'}`}>
-                                  <div className="flex items-center gap-2.5 flex-1 overflow-hidden text-xs">
+                                <div key={idx} className={`flex items-center justify-between gap-2 py-2 px-3 rounded-md transition-colors ${isDone ? 'bg-emerald-500/10' : 'bg-white/5 shadow-sm'}`}>
+                                  <div className="flex items-center gap-2 flex-1 overflow-hidden">
                                     <span className="text-[10px] font-black text-cyan-500/60 shrink-0 tabular-nums bg-cyan-500/10 px-1.5 py-0.5 rounded leading-none">
                                       {m.p1Idx + 1}-{m.p2Idx + 1}
                                     </span>
-                                    <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                                      <span className={`truncate font-bold tracking-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
+                                    <div className="flex flex-col flex-1 overflow-hidden">
+                                      <span className={`text-xs font-bold leading-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
                                         {p1.name}
                                       </span>
-                                      <span className="text-[10px] text-muted-foreground/30 font-black shrink-0 italic">vs</span>
-                                      <span className={`truncate font-bold tracking-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
+                                      <span className="text-[9px] text-muted-foreground/40 font-black italic leading-none my-0.5">vs</span>
+                                      <span className={`text-xs font-bold leading-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
                                         {p2.name}
                                       </span>
                                     </div>
