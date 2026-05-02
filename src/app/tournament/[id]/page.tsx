@@ -5,6 +5,9 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Trophy, Calendar, ChevronRight, ArrowLeft, Layers, Users, Award, Clock } from 'lucide-react'
+import ThemeToggle from '@/components/ThemeToggle'
+import LightBackground from '@/components/LightBackground'
+import Logo from '@/components/Logo'
 import { cn } from '@/lib/utils'
 
 interface Tournament {
@@ -107,23 +110,18 @@ export default function TournamentPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <LightBackground />
       {/* Header */}
-      <header className="page-header">
+      <header className="page-header relative z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Image 
-              src="/assets/LogoSinFondo.png" 
-              alt="Federico TM Logo" 
-              width={140} 
-              height={40} 
-              className="object-contain" 
-              priority
-            />
+            <Logo width={140} height={40} />
           </div>
           <Link href={isAdmin ? '/admin' : '/'} className="btn-secondary py-1.5 px-3 text-xs">
             <ArrowLeft className="w-3.5 h-3.5" />
             {isAdmin ? 'Panel Admin' : 'Inicio'}
           </Link>
+          <ThemeToggle />
         </div>
       </header>
 

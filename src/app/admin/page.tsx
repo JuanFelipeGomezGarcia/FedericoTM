@@ -50,7 +50,9 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/tournaments')
       const data = await res.json()
-      setTournaments(data)
+      setTournaments(Array.isArray(data) ? data : [])
+    } catch {
+      setTournaments([])
     } finally {
       setLoading(false)
     }

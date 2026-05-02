@@ -5,6 +5,9 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Trophy, Medal, Star, Award, Crown, ArrowDown, ArrowLeft, GripVertical, UserPlus, Plus } from 'lucide-react'
+import ThemeToggle from '@/components/ThemeToggle'
+import LightBackground from '@/components/LightBackground'
+import Logo from '@/components/Logo'
 import { cn } from '@/lib/utils'
 import {
   DndContext,
@@ -387,11 +390,12 @@ export default function BracketPage() {
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="min-h-screen bg-background">
+        <LightBackground />
         <header className="page-header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-6">
               <Link href="/">
-                <Image src="/assets/LogoSinFondo.png" alt="Logo" width={130} height={35} className="object-contain" priority />
+                <Logo width={130} height={35} />
               </Link>
               <div className="h-4 w-px bg-border/40" />
               <div className="flex items-center gap-3">
@@ -401,8 +405,9 @@ export default function BracketPage() {
                 <h1 className="text-base font-bold text-foreground">Llaves de Eliminación</h1>
               </div>
             </div>
-            {isAdmin && (
-              <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              {isAdmin && (<div className="flex items-center gap-3">
                 <div className="flex flex-col items-end">
                   <span className="hidden md:inline text-[10px] uppercase tracking-widest text-muted-foreground/60 font-bold bg-white/5 px-3 py-1 rounded-full border border-white/5">
                     Modo Admin
@@ -424,7 +429,8 @@ export default function BracketPage() {
                   </button>
                 )}
               </div>
-            )}
+              )}
+            </div>
           </div>
         </header>
 

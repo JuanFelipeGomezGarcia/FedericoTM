@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Trophy, LogOut, Shield, Eye, EyeOff, LayoutDashboard, Home } from 'lucide-react'
+import ThemeToggle from './ThemeToggle'
+import LightBackground from './LightBackground'
+import Logo from './Logo'
 
 interface AdminLayoutProps {
   children: React.ReactNode
@@ -77,14 +80,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           {/* Logo */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-4">
-              <Image 
-                src="/assets/LogoSinFondo.png" 
-                alt="Federico TM Logo" 
-                width={220} 
-                height={60} 
-                className="object-contain" 
-                priority
-              />
+              <Logo width={220} height={60} />
             </div>
             <p className="text-muted-foreground text-sm mt-1">Panel de Administración</p>
           </div>
@@ -162,19 +158,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <LightBackground />
       {/* Top nav */}
       <header className="page-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <Image 
-                src="/assets/LogoSinFondo.png" 
-                alt="Federico TM Logo" 
-                width={130} 
-                height={35} 
-                className="object-contain" 
-                priority
-              />
+              <Logo width={130} height={35} />
             </div>
             <div className="hidden sm:flex items-center gap-1 ml-4">
               <Link href="/admin" className={pathname === '/admin' ? 'nav-link-active' : 'nav-link'}>
@@ -184,6 +174,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary border border-border">
               <div className="w-2 h-2 rounded-full bg-emerald-400" />
               <span className="text-sm text-muted-foreground">Administrador</span>

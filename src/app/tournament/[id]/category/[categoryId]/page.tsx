@@ -6,6 +6,9 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
 import { ArrowLeft } from 'lucide-react'
+import ThemeToggle from '@/components/ThemeToggle'
+import LightBackground from '@/components/LightBackground'
+import Logo from '@/components/Logo'
 import { generateBergerSchedule } from '@/lib/berger'
 import { cn } from '@/lib/utils'
 
@@ -384,18 +387,12 @@ export default function CategoryPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <LightBackground />
       <header className="page-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <Link href={isAdmin ? "/admin" : "/"}>
-              <Image
-                src="/assets/LogoSinFondo.png"
-                alt="Federico TM Logo"
-                width={140}
-                height={40}
-                className="object-contain"
-                priority
-              />
+              <Logo width={140} height={40} />
             </Link>
             <div className="hidden sm:block h-6 w-px bg-border/40" />
             <div className="flex flex-col">
@@ -423,7 +420,8 @@ export default function CategoryPage() {
               <h1 className="text-lg font-bold text-foreground leading-tight">{category.name}</h1>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <ThemeToggle />
             {hasElimination && (
               <Link
                 href={`/tournament/${tournamentId}/category/${categoryId}/bracket`}

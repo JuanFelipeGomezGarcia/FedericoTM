@@ -13,11 +13,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, date, tables } = await request.json()
-    const tablesCount = parseInt(tables) || 0
+    const { name, date } = await request.json()
     const result = await pool.query(
-      'INSERT INTO tournaments (name, date, tables_count) VALUES ($1, $2, $3) RETURNING *',
-      [name, date, tablesCount]
+      'INSERT INTO tournaments (name, date) VALUES ($1, $2) RETURNING *',
+      [name, date]
     )
     return NextResponse.json(result.rows[0], { status: 201 })
   } catch (error) {
