@@ -195,7 +195,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 relative">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-16">
             <div className="space-y-8 flex flex-col items-center lg:items-start text-center lg:text-left">
-              <Image src="/assets/LogoSinFondo.png" alt="Fundación Federico" width={220} height={60} className="object-contain" />
+              <Logo alt="Fundación Federico" width={220} height={60} className="object-contain" />
               <p className="text-muted-foreground text-lg italic max-w-md leading-relaxed">
                 "La vida nos ha preparado para grandes cosas, hacemos de ellas un reto y las volvemos una realidad."
               </p>
