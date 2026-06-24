@@ -72,7 +72,8 @@ export default function BracketPage() {
 
   // Tables logic (BD-backed)
   const [tablesCount, setTablesCount] = useState<number>(0)
-  const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { ... }
+  const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({})
+  const [tableUpdateTrigger, setTableUpdateTrigger] = useState(0) // tableNumber -> { ... }
 
   // DnD Sensors
   const sensors = useSensors(
@@ -132,6 +133,7 @@ export default function BracketPage() {
       })
     }
     fetchTables()
+    setTableUpdateTrigger(prev => prev + 1)
   }
 
   const releaseTable = async (matchId: number) => {
@@ -142,6 +144,7 @@ export default function BracketPage() {
       headers: { Authorization: `Bearer ${token}` }
     })
     fetchTables()
+    setTableUpdateTrigger(prev => prev + 1)
   }
 
   const fetchStandings = useCallback(async () => {
@@ -483,7 +486,7 @@ export default function BracketPage() {
           </div>
         )}
 
-        <TableStatus tournamentId={tournamentId} isAdmin={isAdmin} />
+        <TableStatus tournamentId={tournamentId} isAdmin={isAdmin} updateTrigger={tableUpdateTrigger} />
 
         <main className={cn("py-8 px-4 overflow-auto transition-opacity", swapping && "opacity-50 pointer-events-none")}>
           {isFinished && showRanking && finalRanking.length > 0 && (

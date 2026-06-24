@@ -73,6 +73,7 @@ export default function CategoryPage() {
   // Tables logic (BD-backed)
   const [tablesCount, setTablesCount] = useState<number>(0)
   const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { ... }
+  const [tableUpdateTrigger, setTableUpdateTrigger] = useState(0)
 
   // Tiebreak panel
   const [tiebreakGroup, setTiebreakGroup] = useState<number | null>(null)
@@ -228,6 +229,7 @@ export default function CategoryPage() {
       })
     }
     fetchTables()
+    setTableUpdateTrigger(prev => prev + 1)
   }
 
   const releaseTable = async (matchId: number) => {
@@ -238,6 +240,7 @@ export default function CategoryPage() {
       headers: { Authorization: `Bearer ${token}` }
     })
     fetchTables()
+    setTableUpdateTrigger(prev => prev + 1)
   }
 
   const startEdit = (match: Match, rowPlayerId: number) => {
@@ -445,7 +448,7 @@ export default function CategoryPage() {
         </div>
       </header>
 
-      <TableStatus tournamentId={tournamentId} isAdmin={isAdmin} />
+      <TableStatus tournamentId={tournamentId} isAdmin={isAdmin} updateTrigger={tableUpdateTrigger} />
 
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-10">
 

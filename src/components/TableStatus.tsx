@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 interface Assignment {
   categoryId: string
@@ -22,10 +22,15 @@ interface TablesData {
 interface TableStatusProps {
   tournamentId: string | number
   isAdmin?: boolean // Mantenemos la prop por compatibilidad con llamadas existentes
+  updateTrigger?: number // Cambia para forzar un refetch de las mesas
 }
 
-export default function TableStatus({ tournamentId, isAdmin }: TableStatusProps) {
+export default function TableStatus({ tournamentId, isAdmin, updateTrigger = 0 }: TableStatusProps) {
   const [data, setData] = useState<TablesData>({ tablesCount: 0, assignments: {} })
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
 
   const fetchTables = useCallback(async () => {
     try {
@@ -41,10 +46,36 @@ export default function TableStatus({ tournamentId, isAdmin }: TableStatusProps)
 
   useEffect(() => {
     fetchTables()
+  }, [fetchTables, updateTrigger])
+
+  useEffect(() => {
     // Polling cada 10s para cambios en tiempo real
     const interval = setInterval(fetchTables, 10000)
     return () => clearInterval(interval)
   }, [fetchTables])
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return
+    setIsDragging(true)
+    setStartX(e.pageX - scrollRef.current.offsetLeft)
+    setScrollLeft(scrollRef.current.scrollLeft)
+  }
+
+  const handleMouseLeave = () => {
+    setIsDragging(false)
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return
+    e.preventDefault()
+    const x = e.pageX - scrollRef.current.offsetLeft
+    const walk = (x - startX) * 2 // Scroll speed multiplier
+    scrollRef.current.scrollLeft = scrollLeft - walk
+  }
 
   if (data.tablesCount === 0) return null
 
@@ -54,7 +85,15 @@ export default function TableStatus({ tournamentId, isAdmin }: TableStatusProps)
   return (
     <div className="border-b border-border/40 bg-background/80 backdrop-blur-xl sticky top-0 z-40 shadow-sm transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-        <div className="flex items-center gap-5 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div 
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          className={`flex items-center gap-5 overflow-x-auto pb-2 scrollbar-hide select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`} 
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground whitespace-nowrap flex-shrink-0 drop-shadow-sm">
             Mesas
           </div>
