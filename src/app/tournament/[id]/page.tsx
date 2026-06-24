@@ -124,18 +124,6 @@ export default function TournamentPage() {
             </div>
           </div>
 
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-[9px] text-emerald-400/60 font-bold">Libre</span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Stats */}
           <div className="flex flex-wrap gap-4 mt-8">
             {[

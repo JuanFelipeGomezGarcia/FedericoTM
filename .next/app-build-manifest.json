@@ -1,3 +1,62 @@
 {
-  "pages": {}
+  "pages": {
+    "/_not-found/page": [
+      "static/chunks/webpack-1d761c4479d0770c.js",
+      "static/chunks/fd9d1056-818910da29c62ee1.js",
+      "static/chunks/23-23e124783eec55fc.js",
+      "static/chunks/main-app-5ec547de8e1e6647.js",
+      "static/chunks/app/_not-found/page-0f21f08ba6023b39.js"
+    ],
+    "/layout": [
+      "static/chunks/webpack-1d761c4479d0770c.js",
+      "static/chunks/fd9d1056-818910da29c62ee1.js",
+      "static/chunks/23-23e124783eec55fc.js",
+      "static/chunks/main-app-5ec547de8e1e6647.js",
+      "static/css/415f2b034fd74752.css",
+      "static/chunks/app/layout-1a43cf971f69a675.js"
+    ],
+    "/admin/page": [
+      "static/chunks/webpack-1d761c4479d0770c.js",
+      "static/chunks/fd9d1056-818910da29c62ee1.js",
+      "static/chunks/23-23e124783eec55fc.js",
+      "static/chunks/main-app-5ec547de8e1e6647.js",
+      "static/chunks/531-2795fba6e0486711.js",
+      "static/chunks/app/admin/page-a1868e944ce447b1.js"
+    ],
+    "/page": [
+      "static/chunks/webpack-1d761c4479d0770c.js",
+      "static/chunks/fd9d1056-818910da29c62ee1.js",
+      "static/chunks/23-23e124783eec55fc.js",
+      "static/chunks/main-app-5ec547de8e1e6647.js",
+      "static/chunks/531-2795fba6e0486711.js",
+      "static/chunks/app/page-717afbd00df3041d.js"
+    ],
+    "/tournament/[id]/category/[categoryId]/bracket/page": [
+      "static/chunks/webpack-1d761c4479d0770c.js",
+      "static/chunks/fd9d1056-818910da29c62ee1.js",
+      "static/chunks/23-23e124783eec55fc.js",
+      "static/chunks/main-app-5ec547de8e1e6647.js",
+      "static/chunks/531-2795fba6e0486711.js",
+      "static/chunks/590-9e866a65ed7edf33.js",
+      "static/chunks/317-8e8e3e965694a73f.js",
+      "static/chunks/app/tournament/[id]/category/[categoryId]/bracket/page-66d5595a0b0cd082.js"
+    ],
+    "/tournament/[id]/page": [
+      "static/chunks/webpack-1d761c4479d0770c.js",
+      "static/chunks/fd9d1056-818910da29c62ee1.js",
+      "static/chunks/23-23e124783eec55fc.js",
+      "static/chunks/main-app-5ec547de8e1e6647.js",
+      "static/chunks/531-2795fba6e0486711.js",
+      "static/chunks/app/tournament/[id]/page-e9ef2a3e28a1038b.js"
+    ],
+    "/tournament/[id]/category/[categoryId]/page": [
+      "static/chunks/webpack-1d761c4479d0770c.js",
+      "static/chunks/fd9d1056-818910da29c62ee1.js",
+      "static/chunks/23-23e124783eec55fc.js",
+      "static/chunks/main-app-5ec547de8e1e6647.js",
+      "static/chunks/531-2795fba6e0486711.js",
+      "static/chunks/590-9e866a65ed7edf33.js",
+      "static/chunks/app/tournament/[id]/category/[categoryId]/page-68b802b742ba0f42.js"
+    ]
+  }
 }
