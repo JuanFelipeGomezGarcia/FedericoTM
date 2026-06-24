@@ -9,6 +9,7 @@ import { ArrowLeft } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 import LightBackground from '@/components/LightBackground'
 import Logo from '@/components/Logo'
+import TableStatus from '@/components/TableStatus'
 import { generateBergerSchedule } from '@/lib/berger'
 import { cn } from '@/lib/utils'
 
@@ -444,64 +445,9 @@ export default function CategoryPage() {
         </div>
       </header>
 
+      <TableStatus tournamentId={tournamentId} isAdmin={isAdmin} />
+
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-10">
-        {/* ── Panel de Mesas (Solo si hay mesas configuradas) ── */}
-        {tablesCount > 0 && (
-          <div className="max-w-7xl mx-auto mb-10 animate-fade-in">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
-                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
-              </div>
-              <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Control de Mesas</h3>
-              {isAdmin && <span className="text-[10px] text-muted-foreground italic">(toca para cambiar estado)</span>}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
-              {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => {
-                const assignment = tableAssignments[num]
-                const isOccupied = !!assignment
-                const isManual = assignment?.matchType === 'manual'
-                return (
-                  <button
-                    key={num}
-                    onClick={() => isAdmin && toggleTableManual(num)}
-                    className={cn(
-                      'border rounded-xl p-3 flex flex-col items-center justify-center gap-1 transition-all duration-300 w-full',
-                      isAdmin ? 'cursor-pointer hover:scale-105 active:scale-95' : 'cursor-default',
-                      isOccupied ? 'bg-rose-500/5 border-rose-500/30 hover:bg-rose-500/15' : 'bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/10'
-                    )}
-                  >
-                    <span className={cn(
-                      'text-[9px] font-black px-2 py-0.5 rounded-full mb-1',
-                      isOccupied ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
-                    )}>MESA {num}</span>
-                    {isOccupied ? (
-                      <div className="text-[10px] text-center w-full animate-in fade-in zoom-in duration-300">
-                        {!isManual && (
-                          <div className="text-[9px] text-rose-400/70 font-bold uppercase truncate w-full mb-0.5 px-1 leading-none">
-                            {assignment.categoryName} — {assignment.groupName}
-                          </div>
-                        )}
-                        <div className="font-bold text-foreground truncate">{assignment.p1Name}</div>
-                        {!isManual && (
-                          <>
-                            <div className="text-[8px] text-muted-foreground/40 leading-none my-0.5">VS</div>
-                            <div className="font-bold text-foreground truncate">{assignment.p2Name}</div>
-                          </>
-                        )}
-                        {isAdmin && <span className="mt-1 text-[8px] text-rose-400/50">Toca para liberar</span>}
-                      </div>
-                    ) : (
-                      <>
-                        <span className="text-[9px] text-emerald-400/60 font-bold">Libre</span>
-                        {isAdmin && <span className="text-[8px] text-emerald-400/40">Toca para ocupar</span>}
-                      </>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
 
         {groups.map(group => {
           const players = (group.players ?? [])

@@ -1,141 +1,115 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
 
-interface Table {
-  id: number
-  tournament_id: number
-  name: string
-  status: 'disponible' | 'ocupada'
+interface Assignment {
+  categoryId: string
+  categoryName: string
+  groupId: number
+  groupName: string
+  matchId: number
+  matchType: string
+  p1Name: string
+  p2Name: string
+  time: string
+}
+
+interface TablesData {
+  tablesCount: number
+  assignments: Record<number, Assignment>
 }
 
 interface TableStatusProps {
   tournamentId: string | number
-  isAdmin: boolean
+  isAdmin?: boolean // Mantenemos la prop por compatibilidad con llamadas existentes
 }
 
 export default function TableStatus({ tournamentId, isAdmin }: TableStatusProps) {
-  const [tables, setTables] = useState<Table[]>([])
-  const [newName, setNewName] = useState('')
-  const [adding, setAdding] = useState(false)
-  const [showAdd, setShowAdd] = useState(false)
+  const [data, setData] = useState<TablesData>({ tablesCount: 0, assignments: {} })
 
   const fetchTables = useCallback(async () => {
-    const res = await fetch(`/api/tables?tournamentId=${tournamentId}`)
-    if (res.ok) setTables(await res.json())
+    try {
+      const res = await fetch(`/api/tables?tournamentId=${tournamentId}`)
+      if (res.ok) {
+        const json = await res.json()
+        setData(json)
+      }
+    } catch (e) {
+      console.error(e)
+    }
   }, [tournamentId])
 
   useEffect(() => {
     fetchTables()
-    // Polling cada 10s para que usuarios no-admin vean cambios en tiempo real
+    // Polling cada 10s para cambios en tiempo real
     const interval = setInterval(fetchTables, 10000)
     return () => clearInterval(interval)
   }, [fetchTables])
 
-  const toggleStatus = async (table: Table) => {
-    if (!isAdmin) return
-    const newStatus = table.status === 'disponible' ? 'ocupada' : 'disponible'
-    const token = localStorage.getItem('admin-token')
-    const res = await fetch('/api/tables', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ id: table.id, status: newStatus }),
-    })
-    if (res.ok) {
-      setTables(prev => prev.map(t => t.id === table.id ? { ...t, status: newStatus } : t))
-    }
-  }
+  if (data.tablesCount === 0) return null
 
-  const addTable = async () => {
-    if (!newName.trim()) return
-    setAdding(true)
-    const token = localStorage.getItem('admin-token')
-    const res = await fetch('/api/tables', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ tournament_id: tournamentId, name: newName.trim() }),
-    })
-    if (res.ok) {
-      const created = await res.json()
-      setTables(prev => [...prev, created])
-      setNewName('')
-      setShowAdd(false)
-    }
-    setAdding(false)
-  }
-
-  const deleteTable = async (id: number) => {
-    const token = localStorage.getItem('admin-token')
-    const res = await fetch(`/api/tables?id=${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (res.ok) setTables(prev => prev.filter(t => t.id !== id))
-  }
-
-  if (tables.length === 0 && !isAdmin) return null
+  // Array of tables 1 to N
+  const tables = Array.from({ length: data.tablesCount }, (_, i) => i + 1)
 
   return (
-    <div className="border-b border-border/30 bg-background/60 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-3 flex-wrap">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0">
-          Mesas
-        </span>
-        <div className="flex items-center gap-2 flex-wrap">
-          {tables.map(table => (
-            <div key={table.id} className="flex items-center gap-1">
-              <button
-                onClick={() => toggleStatus(table)}
-                disabled={!isAdmin}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-200 ${
-                  table.status === 'disponible'
-                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
-                    : 'bg-red-500/15 border-red-500/30 text-red-400 hover:bg-red-500/25'
-                } ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  table.status === 'disponible' ? 'bg-emerald-400' : 'bg-red-400'
-                }`} />
-                {table.name}
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => deleteTable(table.id)}
-                  className="text-muted-foreground/40 hover:text-red-400 transition-colors"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+    <div className="border-b border-border/40 bg-background/80 backdrop-blur-xl sticky top-0 z-40 shadow-sm transition-colors duration-300">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        <div className="flex items-center gap-5 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground whitespace-nowrap flex-shrink-0 drop-shadow-sm">
+            Mesas
+          </div>
+          <div className="flex items-center gap-4">
+            {tables.map(tableNum => {
+              const assignment = data.assignments[tableNum]
+              const isOccupied = !!assignment
 
-        {isAdmin && (
-          showAdd ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                autoFocus
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') addTable(); if (e.key === 'Escape') setShowAdd(false) }}
-                placeholder="Ej: Mesa 1"
-                className="input-field py-1 px-2 text-xs w-28"
-              />
-              <button onClick={addTable} disabled={adding || !newName.trim()} className="btn-primary py-1 px-2 text-xs disabled:opacity-50">
-                {adding ? '...' : 'Agregar'}
-              </button>
-              <button onClick={() => setShowAdd(false)} className="btn-secondary py-1 px-2 text-xs">
-                ✕
-              </button>
-            </div>
-          ) : (
-            <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-cyan-400 transition-colors">
-              <Plus className="w-3.5 h-3.5" />
-              Agregar mesa
-            </button>
-          )
-        )}
+              return (
+                <div 
+                  key={tableNum} 
+                  className={`flex flex-col min-w-[160px] h-[88px] px-3.5 py-2.5 rounded-2xl border transition-all duration-300 ease-out flex-shrink-0 ${
+                    isOccupied 
+                      ? 'bg-red-500/10 border-red-500/30 shadow-[0_4px_20px_rgba(239,68,68,0.15)] hover:border-red-500/50' 
+                      : 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_4px_20px_rgba(16,185,129,0.1)] hover:border-emerald-500/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-bold tracking-wider ${isOccupied ? 'text-red-400' : 'text-emerald-400'} flex items-center gap-2`}>
+                      <span className={`w-2 h-2 rounded-full shadow-sm ${isOccupied ? 'bg-red-500 shadow-red-500/50 animate-pulse' : 'bg-emerald-500 shadow-emerald-500/50'}`} />
+                      MESA {tableNum}
+                    </span>
+                  </div>
+                  
+                  {isOccupied ? (
+                    <div className="flex flex-col gap-0.5 mt-auto">
+                      {assignment.categoryName && assignment.groupName ? (
+                        <span className="text-[10px] text-muted-foreground truncate uppercase font-bold tracking-wide">
+                          {assignment.categoryName} • {assignment.groupName}
+                        </span>
+                      ) : assignment.matchType === 'manual' ? (
+                         <span className="text-[10px] text-muted-foreground truncate uppercase font-bold tracking-wide">Ocupada Manualmente</span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground truncate uppercase font-bold tracking-wide">En Partido</span>
+                      )}
+                      
+                      {assignment.matchType !== 'manual' && (
+                        <div className="text-xs font-semibold text-foreground truncate mt-1">
+                          {assignment.p1Name} <span className="text-muted-foreground/60 text-[10px] mx-1 font-normal">vs</span> {assignment.p2Name}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center mt-auto">
+                      <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
+                        Disponible
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
     </div>
   )

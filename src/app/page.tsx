@@ -103,32 +103,13 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 relative">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-semibold mb-6 backdrop-blur-md animate-fade-in mt-4">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                Resultados en tiempo real
-              </div>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-foreground leading-[1.1] mb-6 drop-shadow-lg [text-wrap:balance]">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-foreground leading-[1.1] mb-6 drop-shadow-lg [text-wrap:balance] mt-8">
                 Torneos de{' '}
                 <span className="gradient-text font-black">Tenis de Mesa</span>
               </h1>
               <p className="text-gray-100 text-lg leading-relaxed mb-10 max-w-xl backdrop-blur-sm bg-black/50 rounded-xl p-4 border border-white/5">
-                Fomentamos el espíritu deportivo y el esfuerzo continuo. Sigue los resultados en vivo y apoya el talento de nuestra comunidad de jóvenes con el respaldo de la fundación.
+                Fomentamos el espíritu deportivo y el esfuerzo continuo. Apoya el talento de nuestra comunidad de jóvenes con el respaldo de la fundación.
               </p>
-              <div className="flex flex-wrap justify-center lg:justify-start gap-4">
-                {[
-                  { icon: Zap, label: 'En curso', value: active.length, color: 'text-emerald-400', border: 'border-emerald-500/20' },
-                  { icon: Trophy, label: 'Finalizados', value: finished.length, color: 'text-cyan-400', border: 'border-cyan-500/20' },
-                  { icon: Users, label: 'Total torneos', value: tournaments.length, color: 'text-blue-400', border: 'border-blue-500/20' },
-                ].map(({ icon: Icon, label, value, color, border }) => (
-                  <div key={label} className={`flex items-center gap-4 glass-card px-5 py-3.5 backdrop-blur-md bg-background/80 border ${border}`}>
-                    <Icon className={`w-6 h-6 ${color}`} />
-                    <div>
-                      <div className="text-2xl font-bold text-foreground leading-none mb-1">{value}</div>
-                      <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
             <div className="hidden lg:flex lg:col-span-5 relative group mt-10 lg:mt-0 justify-center items-center">
               <div className="relative w-full max-w-[320px] aspect-square rounded-2xl overflow-visible transition-all duration-500 group-hover:-translate-y-4 group-hover:scale-105 z-20 flex justify-center items-center">
