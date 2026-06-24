@@ -83,10 +83,14 @@ export async function getGroupStandings(groupId: number) {
   stats.sort((a, b) => {
     if (a.wins !== b.wins) return b.wins - a.wins
 
+    // Manual tiebreak has priority when defined for both tied players
+    if (a.manualTiebreak !== null && b.manualTiebreak !== null && a.manualTiebreak !== b.manualTiebreak) {
+      return a.manualTiebreak - b.manualTiebreak
+    }
+
     // Check if tied on wins
     const tiedPlayers = stats.filter(s => s.wins === a.wins)
     if (tiedPlayers.length === 2) {
-      // Head to head
       const h2h = matches.find(m =>
         (m.player1_id === a.id && m.player2_id === b.id) ||
         (m.player1_id === b.id && m.player2_id === a.id)
@@ -94,7 +98,6 @@ export async function getGroupStandings(groupId: number) {
       if (h2h?.winner_id === a.id) return -1
       if (h2h?.winner_id === b.id) return 1
     } else if (tiedPlayers.length >= 3) {
-      // Among tied: set ratio
       const tiedIds = tiedPlayers.map(p => p.id)
       const tiedMatches = matches.filter(m =>
         tiedIds.includes(m.player1_id) && tiedIds.includes(m.player2_id)
@@ -102,12 +105,14 @@ export async function getGroupStandings(groupId: number) {
       const ratioA = calcRatioAmong(a.id, tiedMatches)
       const ratioB = calcRatioAmong(b.id, tiedMatches)
       if (Math.abs(ratioA - ratioB) > 0.0001) return ratioB - ratioA
-      // Manual tiebreak
-      if (a.manualTiebreak !== null && b.manualTiebreak !== null) return a.manualTiebreak - b.manualTiebreak
+      if (a.manualTiebreak !== null && b.manualTiebreak !== null && a.manualTiebreak !== b.manualTiebreak) {
+        return a.manualTiebreak - b.manualTiebreak
+      }
     }
 
     if (a.setDiff !== b.setDiff) return b.setDiff - a.setDiff
-    return b.setsWon - a.setsWon
+    if (a.setsWon !== b.setsWon) return b.setsWon - a.setsWon
+    return a.name.localeCompare(b.name)
   })
 
   return stats
