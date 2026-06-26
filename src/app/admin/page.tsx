@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminLayout from '@/components/AdminLayout'
+import CategoryCreationForm, { type CategoryDraft } from '@/components/CategoryCreationForm'
 import {
   Trophy, Plus, Trash2, Calendar, ChevronRight, Users,
   ArrowRight, X, Check, AlertCircle, Layers
@@ -14,13 +15,6 @@ interface Tournament {
   name: string
   date: string
   status: string
-}
-
-interface CategoryDraft {
-  name: string
-  players: string
-  players_per_group: string
-  qualified_per_group: string
 }
 
 type Step = 'list' | 'new-tournament' | 'add-categories'
@@ -34,9 +28,7 @@ export default function AdminPage() {
   const [createdTournamentId, setCreatedTournamentId] = useState<number | null>(null)
   const [createdTournamentName, setCreatedTournamentName] = useState('')
   const [categories, setCategories] = useState<CategoryDraft[]>([])
-  const [currentCategory, setCurrentCategory] = useState<CategoryDraft>({
-    name: '', players: '', players_per_group: '4', qualified_per_group: '2'
-  })
+  const [categoryFormResetKey, setCategoryFormResetKey] = useState(0)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [savingCategory, setSavingCategory] = useState(false)
   const [creatingTournament, setCreatingTournament] = useState(false)
@@ -81,8 +73,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleAddCategory = async (values: CategoryDraft) => {
     if (!createdTournamentId) return
     setSavingCategory(true)
     setFormError('')
@@ -92,15 +83,15 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tournament_id: createdTournamentId,
-          name: currentCategory.name,
-          players: currentCategory.players,
-          players_per_group: parseInt(currentCategory.players_per_group),
-          qualified_per_group: parseInt(currentCategory.qualified_per_group),
+          name: values.name,
+          players: values.players,
+          players_per_group: parseInt(values.players_per_group, 10),
+          qualified_per_group: parseInt(values.qualified_per_group, 10),
         }),
       })
       if (res.ok) {
-        setCategories(prev => [...prev, currentCategory])
-        setCurrentCategory({ name: '', players: '', players_per_group: '4', qualified_per_group: '2' })
+        setCategories(prev => [...prev, values])
+        setCategoryFormResetKey(prev => prev + 1)
       } else {
         const err = await res.json()
         setFormError(err.error || 'Error al crear la categoría')
@@ -141,8 +132,6 @@ export default function AdminPage() {
       setDeletingId(null)
     }
   }
-
-  const playerCount = currentCategory.players.split('\n').filter(p => p.trim()).length
 
   return (
     <AdminLayout>
@@ -375,82 +364,14 @@ export default function AdminPage() {
           )}
 
           {/* Add category form */}
-          <div className="glass-card p-6 mb-6">
-            <div className="flex items-center gap-2 mb-5">
-              <Plus className="w-4 h-4 text-cyan-400" />
-              <h2 className="font-semibold text-foreground">Nueva Categoría</h2>
-            </div>
-            <form onSubmit={handleAddCategory} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1.5">Nombre de la categoría</label>
-                <input
-                  type="text"
-                  value={currentCategory.name}
-                  onChange={e => setCurrentCategory({ ...currentCategory, name: e.target.value })}
-                  className="input-field"
-                  placeholder="Ej: Masculino A, Femenino, Sub-18..."
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1.5">Jugadores por grupo</label>
-                  <input
-                    type="number"
-                    min="2"
-                    max="20"
-                    value={currentCategory.players_per_group}
-                    onChange={e => setCurrentCategory({ ...currentCategory, players_per_group: e.target.value })}
-                    className="input-field"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1.5">Clasificados por grupo</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={currentCategory.qualified_per_group}
-                    onChange={e => setCurrentCategory({ ...currentCategory, qualified_per_group: e.target.value })}
-                    className="input-field"
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-sm font-medium text-muted-foreground">Participantes</label>
-                  {playerCount > 0 && (
-                    <span className="text-xs text-cyan-400 font-medium">{playerCount} jugadores</span>
-                  )}
-                </div>
-                <textarea
-                  value={currentCategory.players}
-                  onChange={e => setCurrentCategory({ ...currentCategory, players: e.target.value })}
-                  className="input-field resize-none font-mono text-xs"
-                  rows={8}
-                  placeholder={'Juan García\nMaría López\nCarlos Martínez\n(uno por línea, en orden de nivel)'}
-                  required
-                />
-                <p className="text-xs text-muted-foreground mt-1.5">Un participante por línea, ordenados por nivel (el primero es el mejor)</p>
-              </div>
-              {formError && (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  {formError}
-                </div>
-              )}
-              <button type="submit" disabled={savingCategory} className="btn-secondary w-full disabled:opacity-50">
-                {savingCategory ? (
-                  <div className="w-4 h-4 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4" />
-                )}
-                Agregar Categoría
-              </button>
-            </form>
-          </div>
+          <CategoryCreationForm
+            onSubmit={handleAddCategory}
+            isSubmitting={savingCategory}
+            error={formError}
+            resetKey={categoryFormResetKey}
+            title="Nueva categoría"
+            submitLabel="Agregar categoría"
+          />
 
           {/* Finalize */}
           <div className="glass-card p-5 border border-cyan-500/20 bg-cyan-500/5">

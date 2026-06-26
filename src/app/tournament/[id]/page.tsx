@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Trophy, Calendar, ChevronRight, ArrowLeft, Layers, Users, Award, Clock } from 'lucide-react'
+import { Trophy, Calendar, ChevronRight, ArrowLeft, Layers, Users, Award, Clock, Plus } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 import LightBackground from '@/components/LightBackground'
 import Logo from '@/components/Logo'
 import TableStatus from '@/components/TableStatus'
+import CategoryCreationForm, { CategoryDraft } from '@/components/CategoryCreationForm'
 import { cn } from '@/lib/utils'
 
 interface Tournament {
@@ -34,22 +35,69 @@ export default function TournamentPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [creatingCategory, setCreatingCategory] = useState(false)
+  const [categoryError, setCategoryError] = useState('')
+  const [categoryResetKey, setCategoryResetKey] = useState(0)
 
   useEffect(() => {
     setIsAdmin(!!localStorage.getItem('admin-token'))
   }, [])
 
-  useEffect(() => {
+  const fetchTournamentData = useCallback(async () => {
     if (!tournamentId) return
-    Promise.all([
-      fetch(`/api/tournaments/${tournamentId}`).then(r => r.json()),
-      fetch(`/api/categories?tournamentId=${tournamentId}`).then(r => r.json()),
-    ]).then(([t, cats]) => {
-      setTournament(t)
-      setCategories(Array.isArray(cats) ? cats : [])
+    setLoading(true)
+    try {
+      const [tournamentRes, categoriesRes] = await Promise.all([
+        fetch(`/api/tournaments/${tournamentId}`),
+        fetch(`/api/categories?tournamentId=${tournamentId}`),
+      ])
+      const tournamentData = await tournamentRes.json()
+      const categoriesData = await categoriesRes.json()
+      setTournament(tournamentData)
+      setCategories(Array.isArray(categoriesData) ? categoriesData : [])
+    } catch {
+      setTournament(null)
+      setCategories([])
+    } finally {
       setLoading(false)
-    }).catch(() => setLoading(false))
+    }
   }, [tournamentId])
+
+  useEffect(() => {
+    fetchTournamentData()
+  }, [fetchTournamentData])
+
+  const handleCreateCategory = async (values: CategoryDraft) => {
+    if (!tournamentId) return
+    setCreatingCategory(true)
+    setCategoryError('')
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tournament_id: Number(tournamentId),
+          name: values.name,
+          players: values.players,
+          players_per_group: parseInt(values.players_per_group, 10),
+          qualified_per_group: parseInt(values.qualified_per_group, 10),
+        }),
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null)
+        setCategoryError(errorData?.error || 'Error al crear la categoría')
+        return
+      }
+
+      setCategoryResetKey((prev) => prev + 1)
+      await fetchTournamentData()
+    } catch {
+      setCategoryError('Error al crear la categoría')
+    } finally {
+      setCreatingCategory(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -145,7 +193,26 @@ export default function TournamentPage() {
 
       {/* Categories */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
-        <h2 className="text-xl font-bold text-foreground mb-6">Categorías</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <h2 className="text-xl font-bold text-foreground">Categorías</h2>
+          {isAdmin && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Plus className="w-4 h-4" />
+              Puedes agregar nuevas categorías desde aquí
+            </div>
+          )}
+        </div>
+
+        {isAdmin && (
+          <CategoryCreationForm
+            onSubmit={handleCreateCategory}
+            isSubmitting={creatingCategory}
+            error={categoryError}
+            resetKey={categoryResetKey}
+            title="Agregar nueva categoría"
+            submitLabel="Agregar categoría al torneo"
+          />
+        )}
 
         {categories.length === 0 ? (
           <div className="glass-card flex flex-col items-center justify-center py-20 gap-4">
