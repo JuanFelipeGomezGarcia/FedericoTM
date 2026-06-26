@@ -38,6 +38,7 @@ export default function TournamentPage() {
   const [creatingCategory, setCreatingCategory] = useState(false)
   const [categoryError, setCategoryError] = useState('')
   const [categoryResetKey, setCategoryResetKey] = useState(0)
+  const [showCategoryForm, setShowCategoryForm] = useState(false)
 
   useEffect(() => {
     setIsAdmin(!!localStorage.getItem('admin-token'))
@@ -91,6 +92,7 @@ export default function TournamentPage() {
       }
 
       setCategoryResetKey((prev) => prev + 1)
+      setShowCategoryForm(false)
       await fetchTournamentData()
     } catch {
       setCategoryError('Error al crear la categoría')
@@ -196,22 +198,27 @@ export default function TournamentPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <h2 className="text-xl font-bold text-foreground">Categorías</h2>
           {isAdmin && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <button
+              onClick={() => setShowCategoryForm(!showCategoryForm)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 hover:border-cyan-500/40 text-cyan-400 text-sm font-medium transition-all hover:bg-cyan-500/15"
+            >
               <Plus className="w-4 h-4" />
-              Puedes agregar nuevas categorías desde aquí
-            </div>
+              {showCategoryForm ? 'Cancelar' : 'Agregar categoría'}
+            </button>
           )}
         </div>
 
-        {isAdmin && (
-          <CategoryCreationForm
-            onSubmit={handleCreateCategory}
-            isSubmitting={creatingCategory}
-            error={categoryError}
-            resetKey={categoryResetKey}
-            title="Agregar nueva categoría"
-            submitLabel="Agregar categoría al torneo"
-          />
+        {isAdmin && showCategoryForm && (
+          <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
+            <CategoryCreationForm
+              onSubmit={handleCreateCategory}
+              isSubmitting={creatingCategory}
+              error={categoryError}
+              resetKey={categoryResetKey}
+              title="Agregar nueva categoría"
+              submitLabel="Agregar categoría al torneo"
+            />
+          </div>
         )}
 
         {categories.length === 0 ? (
