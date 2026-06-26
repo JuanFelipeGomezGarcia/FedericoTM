@@ -106,6 +106,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // If the tournament was finalized and now has an active category, mark it as "En curso"
+    const tournamentResult = await pool.query('SELECT status FROM tournaments WHERE id = $1', [tournament_id])
+    const tournament = tournamentResult.rows[0]
+    if (tournament && tournament.status === 'Finalizado') {
+      await pool.query("UPDATE tournaments SET status = 'En curso' WHERE id = $1", [tournament_id])
+    }
+
     return NextResponse.json(category, { status: 201 })
   } catch (error) {
     console.error(error)
