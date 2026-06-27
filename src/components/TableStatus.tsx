@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { X } from 'lucide-react'
 
 interface Assignment {
   categoryId: string
@@ -31,6 +32,7 @@ export default function TableStatus({ tournamentId, isAdmin, updateTrigger = 0 }
   const [isDragging, setIsDragging] = useState(false)
   const [startX, setStartX] = useState(0)
   const [scrollLeft, setScrollLeft] = useState(0)
+  const [clearingTable, setClearingTable] = useState<number | null>(null)
 
   const fetchTables = useCallback(async () => {
     try {
@@ -47,6 +49,24 @@ export default function TableStatus({ tournamentId, isAdmin, updateTrigger = 0 }
   useEffect(() => {
     fetchTables()
   }, [fetchTables, updateTrigger])
+
+  const handleClearTable = async (tableNum: number) => {
+    try {
+      setClearingTable(tableNum)
+      const res = await fetch('/api/tables/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tournamentId, tableNumber: tableNum })
+      })
+      if (res.ok) {
+        await fetchTables()
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setClearingTable(null)
+    }
+  }
 
   useEffect(() => {
     // Polling cada 10s para cambios en tiempo real
@@ -105,12 +125,23 @@ export default function TableStatus({ tournamentId, isAdmin, updateTrigger = 0 }
               return (
                 <div 
                   key={tableNum} 
-                  className={`flex flex-col min-w-[160px] h-[88px] px-3.5 py-2.5 rounded-2xl border transition-all duration-300 ease-out flex-shrink-0 ${
+                  className={`flex flex-col min-w-[160px] h-[88px] px-3.5 py-2.5 rounded-2xl border transition-all duration-300 ease-out flex-shrink-0 relative ${
                     isOccupied 
                       ? 'bg-red-500/10 border-red-500/30 shadow-[0_4px_20px_rgba(239,68,68,0.15)] hover:border-red-500/50' 
                       : 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_4px_20px_rgba(16,185,129,0.1)] hover:border-emerald-500/50'
                   }`}
                 >
+                  {isAdmin && isOccupied && (
+                    <button
+                      onClick={() => handleClearTable(tableNum)}
+                      disabled={clearingTable === tableNum}
+                      className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-muted-foreground/20 hover:bg-muted-foreground/40 border border-muted-foreground/30 flex items-center justify-center transition-all duration-200 disabled:opacity-50 cursor-pointer"
+                      title="Limpiar mesa"
+                    >
+                      <X size={12} className="text-muted-foreground" />
+                    </button>
+                  )}
+                  
                   <div className="flex items-center justify-between mb-2">
                     <span className={`text-xs font-bold tracking-wider ${isOccupied ? 'text-red-400' : 'text-emerald-400'} flex items-center gap-2`}>
                       <span className={`w-2 h-2 rounded-full shadow-sm ${isOccupied ? 'bg-red-500 shadow-red-500/50 animate-pulse' : 'bg-emerald-500 shadow-emerald-500/50'}`} />
