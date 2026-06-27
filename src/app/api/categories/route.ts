@@ -46,19 +46,17 @@ export async function POST(request: NextRequest) {
 
     // Insert players
     const playerNames = players.split('\n').map((name: string) => name.trim()).filter((name: string) => name)
-    const playerInserts = playerNames.map((playerName: string) =>
-      pool.query('INSERT INTO players (category_id, name) VALUES ($1, $2)', [category.id, playerName])
-    )
-    await Promise.all(playerInserts)
+    for (const playerName of playerNames) {
+      await pool.query('INSERT INTO players (category_id, name) VALUES ($1, $2)', [category.id, playerName])
+    }
 
     // Create groups and distribute players
     const numGroups = Math.ceil(playerNames.length / players_per_group)
-    const groupInserts = []
+    const groupIds = []
     for (let i = 0; i < numGroups; i++) {
-      groupInserts.push(pool.query('INSERT INTO groups (category_id, name) VALUES ($1, $2) RETURNING id', [category.id, `Grupo ${i + 1}`]))
+      const groupResult = await pool.query('INSERT INTO groups (category_id, name) VALUES ($1, $2) RETURNING id', [category.id, `Grupo ${i + 1}`])
+      groupIds.push(groupResult.rows[0].id)
     }
-    const groupResults = await Promise.all(groupInserts)
-    const groupIds = groupResults.map(r => r.rows[0].id)
 
     // Distribute players in alternating blocks
     const groupPlayers = []
