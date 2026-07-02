@@ -76,6 +76,30 @@ export default function BracketPage() {
   const [tableUpdateTrigger, setTableUpdateTrigger] = useState(0) // tableNumber -> { ... }
   const [categoryName, setCategoryName] = useState<string>('')
 
+  const eliminationRoundLabel = (round: number, totalRounds: number) => {
+    const fromEnd = totalRounds - round
+    switch (fromEnd) {
+      case 0:
+        return 'Final'
+      case 1:
+        return 'Semifinal'
+      case 2:
+        return 'Cuartos'
+      case 3:
+        return 'Octavos'
+      case 4:
+        return '16vos'
+      case 5:
+        return '32vos'
+      case 6:
+        return '64vos'
+      case 7:
+        return '128vos'
+      default:
+        return `Ronda ${round}`
+    }
+  }
+
   // DnD Sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -125,7 +149,7 @@ export default function BracketPage() {
           categoryId,
           categoryName: categoryName || null,
           groupId: null,
-          groupName: match.round ? `Ronda ${match.round}` : null,
+          groupName: match.round ? eliminationRoundLabel(match.round, totalRounds) : null,
           matchId: match.id,
           matchType: 'elimination',
           p1Name: match.player1_name || '?',
@@ -396,13 +420,7 @@ export default function BracketPage() {
   const allYs = Object.values(matchY).flatMap(r => Object.values(r));
   const canvasH = allYs.length > 0 ? Math.max(...allYs) + CARD_H + PADDING : 600;
   const colX = (round: number) => PADDING + (round - 1) * (CARD_W + COL_GAP);
-  const roundLabel = (round: number) => {
-    const fromEnd = totalRounds - round;
-    if (fromEnd === 0) return 'Final';
-    if (fromEnd === 1) return 'Semifinal';
-    if (fromEnd === 2) return 'Cuartos';
-    return `Ronda ${round}`;
-  };
+  const roundLabel = (round: number) => eliminationRoundLabel(round, totalRounds);
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
