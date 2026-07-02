@@ -4,13 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Trophy, Calendar, ChevronRight, ArrowLeft, Layers, Users, Award, Clock, Plus } from 'lucide-react'
+import { Trophy, Calendar, ChevronRight, ArrowLeft, Layers, Users, Award, Clock, Plus, Trash } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 import LightBackground from '@/components/LightBackground'
 import Logo from '@/components/Logo'
 import TableStatus from '@/components/TableStatus'
 import CategoryCreationForm, { CategoryDraft } from '@/components/CategoryCreationForm'
-import { cn } from '@/lib/utils'
 
 interface Tournament {
   id: number
@@ -39,6 +38,7 @@ export default function TournamentPage() {
   const [categoryError, setCategoryError] = useState('')
   const [categoryResetKey, setCategoryResetKey] = useState(0)
   const [showCategoryForm, setShowCategoryForm] = useState(false)
+  const [deletingCategory, setDeletingCategory] = useState<number | null>(null)
 
   useEffect(() => {
     setIsAdmin(!!localStorage.getItem('admin-token'))
@@ -98,6 +98,40 @@ export default function TournamentPage() {
       setCategoryError('Error al crear la categoría')
     } finally {
       setCreatingCategory(false)
+    }
+  }
+
+  const handleDeleteCategory = async (categoryId: number, categoryName: string) => {
+    if (!isAdmin || deletingCategory !== null) return
+
+    const firstConfirm = window.confirm(
+      `¿Eliminar la categoría "${categoryName}"? Esta acción borrará todos los datos asociados.`
+    )
+    if (!firstConfirm) return
+
+    const secondConfirm = window.confirm(
+      'Esta acción es irreversible. ¿Estás seguro de que deseas continuar?'
+    )
+    if (!secondConfirm) return
+
+    setDeletingCategory(categoryId)
+    try {
+      const res = await fetch(`/api/categories/${categoryId}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null)
+        alert(errorData?.error || 'No se pudo eliminar la categoría')
+        return
+      }
+
+      await fetchTournamentData()
+    } catch (error) {
+      console.error(error)
+      alert('Error al eliminar la categoría')
+    } finally {
+      setDeletingCategory(null)
     }
   }
 
@@ -229,46 +263,64 @@ export default function TournamentPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories.map((cat, i) => (
-              <Link
+              <div
                 key={cat.id}
-                href={`/tournament/${tournamentId}/category/${cat.id}`}
-                className="group glass-card p-5 hover:border-cyan-500/30 hover:glow-cyan transition-all duration-300 animate-fade-in block"
+                className="group glass-card p-5 hover:border-cyan-500/30 hover:glow-cyan transition-all duration-300 animate-fade-in relative"
                 style={{ animationDelay: `${i * 0.06}s`, opacity: 0 }}
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/20 flex items-center justify-center group-hover:from-cyan-500/30 transition-all">
-                    <Layers className="w-5 h-5 text-cyan-400" />
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                    disabled={deletingCategory === cat.id}
+                    className="absolute top-4 right-4 w-9 h-9 rounded-full border border-border/70 bg-background/90 text-muted-foreground hover:bg-destructive/10 transition-colors duration-200"
+                    title={`Eliminar categoría ${cat.name}`}
+                  >
+                    <Trash className="w-4 h-4" />
+                  </button>
+                )}
+                <Link
+                  href={`/tournament/${tournamentId}/category/${cat.id}`}
+                  className="space-y-4 block"
+                  onClick={(event) => {
+                    if (deletingCategory === cat.id) event.preventDefault()
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/20 flex items-center justify-center group-hover:from-cyan-500/30 transition-all">
+                      <Layers className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    {cat.is_finished ? (
+                      <span className="status-finished">
+                        <Award className="w-3 h-3" />
+                        Finalizada
+                      </span>
+                    ) : (
+                      <span className="status-active">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Activa
+                      </span>
+                    )}
                   </div>
-                  {cat.is_finished ? (
-                    <span className="status-finished">
-                      <Award className="w-3 h-3" />
-                      Finalizada
-                    </span>
-                  ) : (
-                    <span className="status-active">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Activa
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-bold text-foreground text-base mb-3 group-hover:text-cyan-400 transition-colors">
-                  {cat.name}
-                </h3>
-                <div className="space-y-1.5 mb-4">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Jugadores por grupo</span>
-                    <span className="font-semibold text-foreground">{cat.players_per_group}</span>
+                  <h3 className="font-bold text-foreground text-base mb-3 group-hover:text-cyan-400 transition-colors">
+                    {cat.name}
+                  </h3>
+                  <div className="space-y-1.5 mb-4">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Jugadores por grupo</span>
+                      <span className="font-semibold text-foreground">{cat.players_per_group}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Clasificados por grupo</span>
+                      <span className="font-semibold text-foreground">{cat.qualified_per_group}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Clasificados por grupo</span>
-                    <span className="font-semibold text-foreground">{cat.qualified_per_group}</span>
+                  <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                    <span className="text-xs text-muted-foreground">Ver categoría</span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
                   </div>
-                </div>
-                <div className="flex items-center justify-between pt-3 border-t border-border/50">
-                  <span className="text-xs text-muted-foreground">Ver categoría</span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-                </div>
-              </Link>
+                </Link>
+              </div>
             ))}
           </div>
         )}
