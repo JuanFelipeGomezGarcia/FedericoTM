@@ -74,6 +74,7 @@ export default function BracketPage() {
   const [tablesCount, setTablesCount] = useState<number>(0)
   const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({})
   const [tableUpdateTrigger, setTableUpdateTrigger] = useState(0) // tableNumber -> { ... }
+  const [categoryName, setCategoryName] = useState<string>('')
 
   // DnD Sensors
   const sensors = useSensors(
@@ -122,7 +123,7 @@ export default function BracketPage() {
           tournamentId,
           tableNumber,
           categoryId,
-          categoryName: null,
+          categoryName: categoryName || null,
           groupId: null,
           groupName: match.round ? `Ronda ${match.round}` : null,
           matchId: match.id,
@@ -162,8 +163,20 @@ export default function BracketPage() {
   }, [categoryId])
 
   useEffect(() => { 
-    fetchMatches() 
-  }, [fetchMatches])
+    fetchMatches()
+    const fetchCategory = async () => {
+      try {
+        const res = await fetch(`/api/categories/${categoryId}`)
+        if (res.ok) {
+          const data = await res.json()
+          setCategoryName(data.name || '')
+        }
+      } catch (e) {
+        console.error('Error fetching category', e)
+      }
+    }
+    fetchCategory()
+  }, [fetchMatches, categoryId])
 
   const setWinner = async (matchId: number, winnerId: number) => {
     setConfirmingSlot(null)
