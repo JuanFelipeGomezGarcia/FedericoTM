@@ -38,6 +38,7 @@ export default function TournamentPage() {
   const [categoryError, setCategoryError] = useState('')
   const [categoryResetKey, setCategoryResetKey] = useState(0)
   const [showCategoryForm, setShowCategoryForm] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
   const [deletingCategory, setDeletingCategory] = useState<number | null>(null)
 
   useEffect(() => {
@@ -101,18 +102,8 @@ export default function TournamentPage() {
     }
   }
 
-  const handleDeleteCategory = async (categoryId: number, categoryName: string) => {
+  const handleDeleteCategory = async (categoryId: number) => {
     if (!isAdmin || deletingCategory !== null) return
-
-    const firstConfirm = window.confirm(
-      `¿Eliminar la categoría "${categoryName}"? Esta acción borrará todos los datos asociados.`
-    )
-    if (!firstConfirm) return
-
-    const secondConfirm = window.confirm(
-      'Esta acción es irreversible. ¿Estás seguro de que deseas continuar?'
-    )
-    if (!secondConfirm) return
 
     setDeletingCategory(categoryId)
     try {
@@ -126,6 +117,7 @@ export default function TournamentPage() {
         return
       }
 
+      setDeleteTarget(null)
       await fetchTournamentData()
     } catch (error) {
       console.error(error)
@@ -265,20 +257,9 @@ export default function TournamentPage() {
             {categories.map((cat, i) => (
               <div
                 key={cat.id}
-                className="group glass-card p-5 hover:border-cyan-500/30 hover:glow-cyan transition-all duration-300 animate-fade-in relative"
+                className="group glass-card p-5 hover:border-cyan-500/30 hover:glow-cyan transition-all duration-300 animate-fade-in"
                 style={{ animationDelay: `${i * 0.06}s`, opacity: 0 }}
               >
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                    disabled={deletingCategory === cat.id}
-                    className="absolute top-4 right-4 w-9 h-9 rounded-full border border-border/70 bg-background/90 text-muted-foreground hover:bg-destructive/10 transition-colors duration-200"
-                    title={`Eliminar categoría ${cat.name}`}
-                  >
-                    <Trash className="w-4 h-4" />
-                  </button>
-                )}
                 <Link
                   href={`/tournament/${tournamentId}/category/${cat.id}`}
                   className="space-y-4 block"
@@ -320,11 +301,66 @@ export default function TournamentPage() {
                     <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
                   </div>
                 </Link>
+                {isAdmin && (
+                  <div className="pt-4 border-t border-border/50 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget({ id: cat.id, name: cat.name })}
+                      disabled={deletingCategory === cat.id}
+                      className="inline-flex items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground hover:bg-destructive/10 transition-colors duration-200 w-9 h-9"
+                      title={`Eliminar categoría ${cat.name}`}
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </main>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center px-4 bg-background/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg glass-card p-8 border border-border/20 animate-scale-in">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-11 h-11 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive">
+                <Trash className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Eliminar categoría</h3>
+                <p className="text-sm text-muted-foreground">
+                  ¿Estás seguro de eliminar la categoría <span className="font-semibold text-foreground">{deleteTarget.name}</span>? Esto borrará todos los datos asociados.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-secondary/60 p-4 border border-border/40">
+                <p className="text-sm text-muted-foreground">Esta acción es irreversible. Solo el administrador puede hacerla.</p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  className="flex-1 sm:flex-none px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-medium transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteTarget && handleDeleteCategory(deleteTarget.id)}
+                  disabled={deletingCategory !== null}
+                  className="flex-1 sm:flex-none px-4 py-3 rounded-xl bg-destructive text-destructive-foreground font-bold hover:bg-destructive/80 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {deletingCategory === deleteTarget.id ? 'Eliminando...' : 'Confirmar eliminación'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
