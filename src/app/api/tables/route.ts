@@ -72,6 +72,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // ── Verificar conflicto: ¿alguno de los jugadores ya está en otra mesa? ──
+    // Comparamos por nombre (case-insensitive) asumiendo que el mismo nombre = misma persona
+    if (p1Name || p2Name) {
+      const existingAssignments = await pool.query(
+        `SELECT table_number, p1_name, p2_name, match_id, match_type
+         FROM table_assignments
+         WHERE tournament_id = $1
+           AND match_type != 'manual'`,
+        [tournamentId]
+      )
+
+      for (const row of existingAssignments.rows) {
+        // Ignorar si es la misma asignación de este partido (reasignación de mesa)
+        if (Number(row.match_id) === Number(matchId) && row.match_type === (matchType || 'round-robin')) continue
+
+        const existingNames = [
+          (row.p1_name || '').trim().toLowerCase(),
+          (row.p2_name || '').trim().toLowerCase()
+        ]
+        const newNames = [
+          (p1Name || '').trim().toLowerCase(),
+          (p2Name || '').trim().toLowerCase()
+        ]
+
+        for (const newName of newNames) {
+          if (!newName) continue
+          if (existingNames.includes(newName)) {
+            // Encontramos conflicto
+            const conflictingPlayer = [p1Name, p2Name].find(
+              n => (n || '').trim().toLowerCase() === newName
+            )
+            return NextResponse.json(
+              {
+                error: 'conflict',
+                message: `${conflictingPlayer} ya está jugando en la Mesa ${row.table_number}. No se puede asignar esta mesa.`,
+                player: conflictingPlayer,
+                conflictTable: row.table_number
+              },
+              { status: 409 }
+            )
+          }
+        }
+      }
+    }
+
     // Si el partido ya estaba asignado a otra mesa, liberarla
     await pool.query(
       'DELETE FROM table_assignments WHERE tournament_id = $1 AND match_id = $2 AND match_type = $3',

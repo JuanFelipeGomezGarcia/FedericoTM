@@ -76,6 +76,7 @@ export default function CategoryPage() {
   const [tableUpdateTrigger, setTableUpdateTrigger] = useState(0)
   const [showStandings, setShowStandings] = useState<Record<number, boolean>>({})
   const [draggedOverGroupId, setDraggedOverGroupId] = useState<number | null>(null)
+  const [tableConflictError, setTableConflictError] = useState<string | null>(null)
 
   const toggleStandings = (groupId: number) => {
     setShowStandings(prev => ({ ...prev, [groupId]: !prev[groupId] }))
@@ -210,6 +211,7 @@ export default function CategoryPage() {
   const assignTable = async (tableNumber: number, match: Match, groupName: string) => {
     const token = localStorage.getItem('admin-token')
     if (!token) return
+    setTableConflictError(null)
     if (tableNumber <= 0) {
       // Liberar la mesa donde estaba este partido
       await fetch(`/api/tables?tournamentId=${tournamentId}&matchId=${match.id}&matchType=round-robin`, {
@@ -217,7 +219,7 @@ export default function CategoryPage() {
         headers: { Authorization: `Bearer ${token}` }
       })
     } else {
-      await fetch('/api/tables', {
+      const res = await fetch('/api/tables', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -233,6 +235,11 @@ export default function CategoryPage() {
           p2Name: match.player2_name
         })
       })
+      if (res.status === 409) {
+        const data = await res.json()
+        setTableConflictError(data.message || 'Conflicto: un jugador ya está en otra mesa.')
+        return
+      }
     }
     fetchTables()
     setTableUpdateTrigger(prev => prev + 1)
@@ -929,6 +936,20 @@ export default function CategoryPage() {
           </div>
         )}
       </main>
+
+      {/* ── Toast de conflicto de mesa ── */}
+      {tableConflictError && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-3 bg-red-950 border border-red-500/50 text-red-200 rounded-xl px-5 py-4 shadow-2xl shadow-red-900/40 max-w-md">
+            <span className="text-red-400 text-lg shrink-0">⚠️</span>
+            <p className="text-sm font-medium flex-1">{tableConflictError}</p>
+            <button
+              onClick={() => setTableConflictError(null)}
+              className="text-red-400 hover:text-red-200 text-lg leading-none shrink-0 transition-colors"
+            >✕</button>
+          </div>
+        </div>
+      )}
 
       {/* ── Panel de desempate manual ── */}
       {tiebreakGroup !== null && (
