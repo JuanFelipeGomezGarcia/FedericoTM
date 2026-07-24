@@ -74,6 +74,11 @@ export default function CategoryPage() {
   const [tablesCount, setTablesCount] = useState<number>(0)
   const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { ... }
   const [tableUpdateTrigger, setTableUpdateTrigger] = useState(0)
+  const [showStandings, setShowStandings] = useState<Record<number, boolean>>({})
+
+  const toggleStandings = (groupId: number) => {
+    setShowStandings(prev => ({ ...prev, [groupId]: !prev[groupId] }))
+  }
 
   // Tiebreak panel
   const [tiebreakGroup, setTiebreakGroup] = useState<number | null>(null)
@@ -450,129 +455,128 @@ export default function CategoryPage() {
 
       <TableStatus tournamentId={tournamentId} isAdmin={isAdmin} updateTrigger={tableUpdateTrigger} />
 
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-10">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {groups.map(group => {
+            const players = (group.players ?? [])
+              .filter(p => p.id)
+              .sort((a, b) => a.position - b.position)
+            const gMatches = groupMatches(group.id)
+            const gStandings = standings[group.id] ?? []
+            const totalMatches = gMatches.length
+            const doneMatches = gMatches.filter(m => m.result).length
 
-        {groups.map(group => {
-          const players = (group.players ?? [])
-            .filter(p => p.id)
-            .sort((a, b) => a.position - b.position)
-          const gMatches = groupMatches(group.id)
-          const gStandings = standings[group.id] ?? []
-          const totalMatches = gMatches.length
-          const doneMatches = gMatches.filter(m => m.result).length
-
-          return (
-            <Card key={group.id} className="border-border/60 bg-card/20 overflow-hidden shadow-xl mb-12">
-              <CardHeader className="bg-secondary/10 border-b border-border/40 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-600 to-cyan-400 flex items-center justify-center text-black font-black shadow-lg shadow-cyan-500/20">
-                      {group.name.split(' ')[1] || group.name[0]}
+            return (
+              <Card key={group.id} className="border-border/60 bg-card/20 overflow-hidden shadow-xl">
+                <CardHeader className="bg-secondary/10 border-b border-border/40 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-600 to-cyan-400 flex items-center justify-center text-black font-black shadow-lg shadow-cyan-500/20">
+                        {group.name.split(' ')[1] || group.name[0]}
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-foreground leading-none mb-1">{group.name}</h2>
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                          {doneMatches}/{totalMatches} partidos completados
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-foreground leading-none mb-1">{group.name}</h2>
-                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
-                        {doneMatches}/{totalMatches} partidos completados
-                      </p>
-                    </div>
+                    {isAdmin && !category.is_finished && (
+                      <button
+                        onClick={() => { setNewPlayerGroup(group.id); setNewPlayerName('') }}
+                        className="btn-secondary text-[10px] px-3 py-1 uppercase tracking-wider font-bold"
+                      >
+                        + Jugador
+                      </button>
+                    )}
                   </div>
-                  {isAdmin && !category.is_finished && (
-                    <button
-                      onClick={() => { setNewPlayerGroup(group.id); setNewPlayerName('') }}
-                      className="btn-secondary text-[10px] px-3 py-1 uppercase tracking-wider font-bold"
-                    >
-                      + Jugador
-                    </button>
+                </CardHeader>
+
+                <CardContent className="p-6 space-y-8">
+                  {/* ── Panel agregar jugador ── */}
+                  {isAdmin && newPlayerGroup === group.id && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary border border-border animate-in slide-in-from-top-2 duration-300">
+                      <input
+                        autoFocus
+                        className="input-field flex-1 py-1.5 text-sm"
+                        placeholder="Nombre del jugador"
+                        value={newPlayerName}
+                        onChange={e => setNewPlayerName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') addPlayer(group.id)
+                          if (e.key === 'Escape') setNewPlayerGroup(null)
+                        }}
+                      />
+                      <button
+                        onClick={() => addPlayer(group.id)}
+                        disabled={playerActionLoading || !newPlayerName.trim()}
+                        className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50"
+                      >
+                        {playerActionLoading ? '...' : 'Agregar'}
+                      </button>
+                      <button onClick={() => setNewPlayerGroup(null)} className="btn-secondary text-xs px-3 py-1.5">
+                        Cancelar
+                      </button>
+                    </div>
                   )}
-                </div>
-              </CardHeader>
 
-              <CardContent className="p-6 space-y-8">
-                {/* ── Panel agregar jugador ── */}
-                {isAdmin && newPlayerGroup === group.id && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary border border-border animate-in slide-in-from-top-2 duration-300">
-                    <input
-                      autoFocus
-                      className="input-field flex-1 py-1.5 text-sm"
-                      placeholder="Nombre del jugador"
-                      value={newPlayerName}
-                      onChange={e => setNewPlayerName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') addPlayer(group.id)
-                        if (e.key === 'Escape') setNewPlayerGroup(null)
-                      }}
-                    />
-                    <button
-                      onClick={() => addPlayer(group.id)}
-                      disabled={playerActionLoading || !newPlayerName.trim()}
-                      className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50"
-                    >
-                      {playerActionLoading ? '...' : 'Agregar'}
-                    </button>
-                    <button onClick={() => setNewPlayerGroup(null)} className="btn-secondary text-xs px-3 py-1.5">
-                      Cancelar
-                    </button>
-                  </div>
-                )}
+                  {/* ── Lista de jugadores editable (solo admin) ── */}
+                  {isAdmin && !category.is_finished && players.length > 0 && (
+                    <Card className="border-border/40 bg-background/80 shadow-xl shadow-black/20 ring-1 ring-white/5">
+                      <CardHeader className="py-3 border-b border-border/10">
+                        <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-tight">Jugadores del grupo</CardTitle>
+                      </CardHeader>
+                      <CardContent className="py-4">
+                        <ul className="space-y-1">
+                          {players.map(p => (
+                            <li key={p.id} className="flex items-center gap-2">
+                              {editingPlayer?.id === p.id ? (
+                                <>
+                                  <input
+                                    autoFocus
+                                    className="input-field flex-1 py-1 text-sm"
+                                    value={editingPlayer.name}
+                                    onChange={e => setEditingPlayer({ id: p.id, name: e.target.value })}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') renamePlayer(p.id, editingPlayer.name)
+                                      if (e.key === 'Escape') setEditingPlayer(null)
+                                    }}
+                                  />
+                                  <button
+                                    onMouseDown={e => { e.preventDefault(); renamePlayer(p.id, editingPlayer.name) }}
+                                    disabled={playerActionLoading}
+                                    className="text-xs px-2 py-1 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400 disabled:opacity-50"
+                                  >✓</button>
+                                  <button
+                                    onMouseDown={e => { e.preventDefault(); setEditingPlayer(null) }}
+                                    className="text-xs px-2 py-1 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground"
+                                  >✕</button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="flex-1 text-sm text-foreground">{p.name}</span>
+                                  <button
+                                    onClick={() => setEditingPlayer({ id: p.id, name: p.name })}
+                                    className="text-xs text-muted-foreground hover:text-cyan-400 px-2 py-1 rounded hover:bg-secondary transition-colors"
+                                  >✏️</button>
+                                  <button
+                                    onClick={() => deletePlayer(p.id, group.id)}
+                                    disabled={playerActionLoading}
+                                    className="text-xs text-muted-foreground hover:text-red-400 px-2 py-1 rounded hover:bg-secondary transition-colors disabled:opacity-50"
+                                  >🗑️</button>
+                                </>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                {/* ── Lista de jugadores editable (solo admin) ── */}
-                {isAdmin && !category.is_finished && players.length > 0 && (
-                  <Card className="border-border/40 bg-background/80 shadow-xl shadow-black/20 ring-1 ring-white/5">
-                    <CardHeader className="py-3 border-b border-border/10">
-                      <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-tight">Jugadores del grupo</CardTitle>
-                    </CardHeader>
-                    <CardContent className="py-4">
-                      <ul className="space-y-1">
-                        {players.map(p => (
-                          <li key={p.id} className="flex items-center gap-2">
-                            {editingPlayer?.id === p.id ? (
-                              <>
-                                <input
-                                  autoFocus
-                                  className="input-field flex-1 py-1 text-sm"
-                                  value={editingPlayer.name}
-                                  onChange={e => setEditingPlayer({ id: p.id, name: e.target.value })}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter') renamePlayer(p.id, editingPlayer.name)
-                                    if (e.key === 'Escape') setEditingPlayer(null)
-                                  }}
-                                />
-                                <button
-                                  onMouseDown={e => { e.preventDefault(); renamePlayer(p.id, editingPlayer.name) }}
-                                  disabled={playerActionLoading}
-                                  className="text-xs px-2 py-1 rounded bg-cyan-500 text-slate-900 font-semibold hover:bg-cyan-400 disabled:opacity-50"
-                                >✓</button>
-                                <button
-                                  onMouseDown={e => { e.preventDefault(); setEditingPlayer(null) }}
-                                  className="text-xs px-2 py-1 rounded bg-secondary border border-border text-muted-foreground hover:text-foreground"
-                                >✕</button>
-                              </>
-                            ) : (
-                              <>
-                                <span className="flex-1 text-sm text-foreground">{p.name}</span>
-                                <button
-                                  onClick={() => setEditingPlayer({ id: p.id, name: p.name })}
-                                  className="text-xs text-muted-foreground hover:text-cyan-400 px-2 py-1 rounded hover:bg-secondary transition-colors"
-                                >✏️</button>
-                                <button
-                                  onClick={() => deletePlayer(p.id, group.id)}
-                                  disabled={playerActionLoading}
-                                  className="text-xs text-muted-foreground hover:text-red-400 px-2 py-1 rounded hover:bg-secondary transition-colors disabled:opacity-50"
-                                >🗑️</button>
-                              </>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* ── Tablas Principales (Alturas Igualadas) ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+                  {/* ── Tabla de Resultados ── */}
                   <div className="flex flex-col group/card">
                     {players.length > 0 && (
-                      <Card className="h-full flex flex-col border-border/50 bg-background/90 shadow-2xl shadow-black/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-cyan-500/10 ring-1 ring-white/5">
+                      <Card className="h-full flex flex-col border-border/50 bg-background/90 shadow-2xl shadow-black/40 transition-all duration-300 hover:shadow-cyan-500/10 ring-1 ring-white/5">
                         <CardHeader className="py-4 px-5 border-b border-border/20 bg-secondary/5">
                           <CardTitle className="text-sm font-bold text-muted-foreground">Tabla de Resultados</CardTitle>
                         </CardHeader>
@@ -683,161 +687,170 @@ export default function CategoryPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-col group/card">
-                    {gStandings.length > 0 && (
-                      <Card className="h-full flex flex-col border-border/50 bg-background/90 shadow-2xl shadow-black/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-cyan-500/10 ring-1 ring-white/5">
-                        <CardHeader className="py-4 px-5 border-b border-border/20 bg-secondary/5 flex flex-row items-center justify-between space-y-0 text-foreground">
-                          <CardTitle className="text-sm font-bold text-muted-foreground">Posiciones</CardTitle>
-                          {!category.is_finished && isAdmin && (
-                            <button
-                              className="text-[10px] bg-secondary border border-border hover:text-cyan-400 px-3 py-1 rounded transition-all"
-                              onClick={() => openTiebreak(group.id)}
-                            >
-                              Manual
-                            </button>
-                          )}
-                        </CardHeader>
-                        <CardContent className="flex-1 overflow-x-auto p-5">
-                          <table className="text-sm w-full border-collapse">
-                            <thead>
-                              <tr className="bg-secondary">
-                                <th className="border border-border px-3 py-2 text-center text-foreground w-10">#</th>
-                                <th className="border border-border px-3 py-2 text-left text-foreground">Jugador</th>
-                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">PJ</th>
-                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">G</th>
-                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">P</th>
-                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">SF</th>
-                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">SC</th>
-                                <th className="border border-border px-2 py-2 text-center text-muted-foreground">Dif</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {gStandings.map((s, idx) => (
-                                <tr
-                                  key={s.id}
-                                  className={`${idx < category.qualified_per_group ? 'bg-emerald-500/10' : ''} hover:bg-white/5 transition-colors`}
-                                >
-                                  <td className="border border-border px-3 py-2 text-center font-bold text-foreground">
-                                    {idx + 1}
-                                  </td>
-                                  <td className="border border-border px-3 py-2 font-medium text-foreground">
-                                    {s.name}
-                                    {s.manualTiebreak !== null && (
-                                      <span className="ml-1 text-xs text-warning">(M)</span>
-                                    )}
-                                  </td>
-                                  <td className="border border-border px-2 py-2 text-center text-foreground">{s.played}</td>
-                                  <td className="border border-border px-2 py-2 text-center text-emerald-400 font-semibold">{s.wins}</td>
-                                  <td className="border border-border px-2 py-2 text-center text-red-400">{s.losses}</td>
-                                  <td className="border border-border px-2 py-2 text-center text-foreground">{s.setsWon}</td>
-                                  <td className="border border-border px-2 py-2 text-center text-foreground">{s.setsLost}</td>
-                                  <td className="border border-border px-2 py-2 text-center font-mono text-foreground font-bold">
-                                    {s.setDiff > 0 ? `+${s.setDiff}` : s.setDiff}
-                                  </td>
+                  {/* ── Tabla de Posiciones Desplegable ── */}
+                  {gStandings.length > 0 && (
+                    <div className="space-y-4">
+                      <button
+                        onClick={() => toggleStandings(group.id)}
+                        className="btn-secondary w-full text-xs py-2 px-4 flex items-center justify-center gap-2 border border-border/50 hover:bg-secondary/80 transition-all font-bold uppercase tracking-wider"
+                      >
+                        {showStandings[group.id] ? '🔼 Ocultar Posiciones' : '🔽 Ver Posiciones'}
+                      </button>
+                      {showStandings[group.id] && (
+                        <Card className="border-border/50 bg-background/90 shadow-2xl shadow-black/40 transition-all duration-300 hover:shadow-cyan-500/10 ring-1 ring-white/5 animate-in slide-in-from-top-2 duration-200">
+                          <CardHeader className="py-4 px-5 border-b border-border/20 bg-secondary/5 flex flex-row items-center justify-between space-y-0 text-foreground">
+                            <CardTitle className="text-sm font-bold text-muted-foreground">Posiciones</CardTitle>
+                            {!category.is_finished && isAdmin && (
+                              <button
+                                className="text-[10px] bg-secondary border border-border hover:text-cyan-400 px-3 py-1 rounded transition-all"
+                                onClick={() => openTiebreak(group.id)}
+                              >
+                                Manual
+                              </button>
+                            )}
+                          </CardHeader>
+                          <CardContent className="overflow-x-auto p-5">
+                            <table className="text-sm w-full border-collapse">
+                              <thead>
+                                <tr className="bg-secondary">
+                                  <th className="border border-border px-3 py-2 text-center text-foreground w-10">#</th>
+                                  <th className="border border-border px-3 py-2 text-left text-foreground">Jugador</th>
+                                  <th className="border border-border px-2 py-2 text-center text-muted-foreground">PJ</th>
+                                  <th className="border border-border px-2 py-2 text-center text-muted-foreground">G</th>
+                                  <th className="border border-border px-2 py-2 text-center text-muted-foreground">P</th>
+                                  <th className="border border-border px-2 py-2 text-center text-muted-foreground">SF</th>
+                                  <th className="border border-border px-2 py-2 text-center text-muted-foreground">SC</th>
+                                  <th className="border border-border px-2 py-2 text-center text-muted-foreground">Dif</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          <div className="mt-4 flex items-center gap-2 text-[10px] text-muted-foreground italic">
-                            Fondo verde = clasificados ({category.qualified_per_group} por grupo)
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </div>
+                              </thead>
+                              <tbody>
+                                {gStandings.map((s, idx) => (
+                                  <tr
+                                    key={s.id}
+                                    className={`${idx < category.qualified_per_group ? 'bg-emerald-500/10' : ''} hover:bg-white/5 transition-colors`}
+                                  >
+                                    <td className="border border-border px-3 py-2 text-center font-bold text-foreground">
+                                      {idx + 1}
+                                    </td>
+                                    <td className="border border-border px-3 py-2 font-medium text-foreground">
+                                      {s.name}
+                                      {s.manualTiebreak !== null && (
+                                        <span className="ml-1 text-xs text-warning">(M)</span>
+                                      )}
+                                    </td>
+                                    <td className="border border-border px-2 py-2 text-center text-foreground">{s.played}</td>
+                                    <td className="border border-border px-2 py-2 text-center text-emerald-400 font-semibold">{s.wins}</td>
+                                    <td className="border border-border px-2 py-2 text-center text-red-400">{s.losses}</td>
+                                    <td className="border border-border px-2 py-2 text-center text-foreground">{s.setsWon}</td>
+                                    <td className="border border-border px-2 py-2 text-center text-foreground">{s.setsLost}</td>
+                                    <td className="border border-border px-2 py-2 text-center font-mono text-foreground font-bold">
+                                      {s.setDiff > 0 ? `+${s.setDiff}` : s.setDiff}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            <div className="mt-4 flex items-center gap-2 text-[10px] text-muted-foreground italic">
+                              Fondo verde = clasificados ({category.qualified_per_group} por grupo)
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
 
-                {/* ── Secuencia de Partidos (Pie de la Tarjeta Madre) ── */}
-                {players.length > 0 && (
-                  <div className="pt-8 border-t border-border/40">
-                    <div className="flex items-center justify-between mb-5 px-2">
-                      <h4 className="text-[11px] uppercase tracking-[0.3em] text-cyan-400 font-black flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)]" />
-                        Secuencia de Juego
-                      </h4>
-                      <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-medium">
-                        <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-border" /> Pendiente</span>
-                        <span className="flex items-center gap-1.5 text-emerald-500"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Jugado</span>
+                  {/* ── Secuencia de Partidos ── */}
+                  {players.length > 0 && (
+                    <div className="pt-8 border-t border-border/40">
+                      <div className="flex items-center justify-between mb-5 px-2">
+                        <h4 className="text-[11px] uppercase tracking-[0.3em] text-cyan-400 font-black flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.6)]" />
+                          Secuencia de Juego
+                        </h4>
+                        <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-medium">
+                          <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-border" /> Pendiente</span>
+                          <span className="flex items-center gap-1.5 text-emerald-500"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Jugado</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {generateBergerSchedule(players.length).map((round) => (
+                          <div key={round.round} className="bg-secondary/10 rounded-lg p-3 border border-border/20">
+                            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-white/5">
+                              <span className="text-[10px] font-black text-cyan-500 bg-cyan-500/10 px-1.5 py-0.5 rounded">S{round.round}</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {round.matches.map((m, idx) => {
+                                const p1 = players[m.p1Idx];
+                                const p2 = players[m.p2Idx];
+                                const matchObj = getResult(group.id, p1.id, p2.id);
+                                const isDone = !!matchObj?.result;
+
+                                return (
+                                  <div key={idx} className={`flex items-center justify-between gap-2 py-2 px-3 rounded-md transition-colors ${isDone ? 'bg-emerald-500/10' : 'bg-white/5 shadow-sm'}`}>
+                                    <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                                      <span className="text-[10px] font-black text-cyan-500/60 shrink-0 tabular-nums bg-cyan-500/10 px-1.5 py-0.5 rounded leading-none">
+                                        {m.p1Idx + 1}-{m.p2Idx + 1}
+                                      </span>
+                                      <div className="flex flex-col flex-1 overflow-hidden">
+                                        <span className={`text-xs font-bold leading-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
+                                          {p1.name}
+                                        </span>
+                                        <span className="text-[9px] text-muted-foreground/40 font-black italic leading-none my-0.5">vs</span>
+                                        <span className={`text-xs font-bold leading-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
+                                          {p2.name}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {isDone ? (
+                                      <div className="flex items-center justify-center shrink-0">
+                                        <span className="text-xs text-emerald-500 font-black">✓</span>
+                                      </div>
+                                    ) : tablesCount > 0 && (
+                                      <div className="flex items-center gap-2">
+                                        {isAdmin ? (
+                                          <select
+                                            className="bg-background border border-border/50 rounded px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground focus:border-cyan-500/50 outline-none cursor-pointer"
+                                            value={Object.keys(tableAssignments).find(num => tableAssignments[num as any].matchId === matchObj?.id) || ""}
+                                            onChange={(e) => {
+                                              if (matchObj) assignTable(parseInt(e.target.value) || 0, matchObj, group.name)
+                                            }}
+                                          >
+                                            <option value="">Mesa —</option>
+                                            {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => (
+                                              <option 
+                                                key={num} 
+                                                value={num} 
+                                                disabled={!!tableAssignments[num] && tableAssignments[num].matchId !== matchObj?.id}
+                                              >
+                                                Mesa {num} {tableAssignments[num] ? '(Ocup)' : ''}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        ) : (() => {
+                                          const tableNum = Object.keys(tableAssignments).find(num => tableAssignments[num as any].matchId === matchObj?.id)
+                                          return tableNum ? (
+                                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/20">
+                                              Mesa {tableNum}
+                                            </span>
+                                          ) : null
+                                        })()}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {generateBergerSchedule(players.length).map((round) => (
-                        <div key={round.round} className="bg-secondary/10 rounded-lg p-3 border border-border/20">
-                          <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-white/5">
-                            <span className="text-[10px] font-black text-cyan-500 bg-cyan-500/10 px-1.5 py-0.5 rounded">S{round.round}</span>
-                          </div>
-                          <div className="space-y-1.5">
-                            {round.matches.map((m, idx) => {
-                              const p1 = players[m.p1Idx];
-                              const p2 = players[m.p2Idx];
-                              const matchObj = getResult(group.id, p1.id, p2.id);
-                              const isDone = !!matchObj?.result;
-
-                              return (
-                                <div key={idx} className={`flex items-center justify-between gap-2 py-2 px-3 rounded-md transition-colors ${isDone ? 'bg-emerald-500/10' : 'bg-white/5 shadow-sm'}`}>
-                                  <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                                    <span className="text-[10px] font-black text-cyan-500/60 shrink-0 tabular-nums bg-cyan-500/10 px-1.5 py-0.5 rounded leading-none">
-                                      {m.p1Idx + 1}-{m.p2Idx + 1}
-                                    </span>
-                                    <div className="flex flex-col flex-1 overflow-hidden">
-                                      <span className={`text-xs font-bold leading-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
-                                        {p1.name}
-                                      </span>
-                                      <span className="text-[9px] text-muted-foreground/40 font-black italic leading-none my-0.5">vs</span>
-                                      <span className={`text-xs font-bold leading-tight ${isDone ? 'text-emerald-500' : 'text-foreground/90'}`}>
-                                        {p2.name}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  {isDone ? (
-                                    <div className="flex items-center justify-center shrink-0">
-                                      <span className="text-xs text-emerald-500 font-black">✓</span>
-                                    </div>
-                                  ) : tablesCount > 0 && (
-                                    <div className="flex items-center gap-2">
-                                      {isAdmin ? (
-                                        <select
-                                          className="bg-background border border-border/50 rounded px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground focus:border-cyan-500/50 outline-none cursor-pointer"
-                                          value={Object.keys(tableAssignments).find(num => tableAssignments[num].matchId === matchObj?.id) || ""}
-                                          onChange={(e) => {
-                                            if (matchObj) assignTable(parseInt(e.target.value) || 0, matchObj, group.name)
-                                          }}
-                                        >
-                                          <option value="">Mesa —</option>
-                                          {Array.from({ length: tablesCount }, (_, i) => i + 1).map(num => (
-                                            <option 
-                                              key={num} 
-                                              value={num} 
-                                              disabled={!!tableAssignments[num] && tableAssignments[num].matchId !== matchObj?.id}
-                                            >
-                                              Mesa {num} {tableAssignments[num] ? '(Ocup)' : ''}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      ) : (() => {
-                                        const tableNum = Object.keys(tableAssignments).find(num => tableAssignments[num].matchId === matchObj?.id)
-                                        return tableNum ? (
-                                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/20">
-                                            Mesa {tableNum}
-                                          </span>
-                                        ) : null
-                                      })()}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )
-        })}
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
 
         {groups.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
