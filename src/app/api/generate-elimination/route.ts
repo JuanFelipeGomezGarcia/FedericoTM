@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     // Delete existing elimination matches
     await pool.query('DELETE FROM elimination_matches WHERE category_id = $1', [categoryId])
 
-    const groupsResult = await pool.query('SELECT id, name FROM groups WHERE category_id = $1 ORDER BY name', [categoryId])
+    const groupsResult = await pool.query('SELECT id, name FROM groups WHERE category_id = $1 ORDER BY NULLIF(regexp_replace(name, \'\\D\', \'\', \'g\'), \'\')::int, name', [categoryId])
     const groups = groupsResult.rows
 
     // Get qualified players per group in order

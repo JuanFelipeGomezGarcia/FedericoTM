@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       params = [categoryId]
     }
 
-    query += ' GROUP BY g.id ORDER BY g.name'
+    query += ' GROUP BY g.id ORDER BY NULLIF(regexp_replace(g.name, \'\\D\', \'\', \'g\'), \'\')::int, g.name'
 
     const result = await pool.query(query, params)
     return NextResponse.json(result.rows)

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(standings)
     }
 
-    const groupsResult = await pool.query('SELECT id FROM groups WHERE category_id = $1 ORDER BY name', [categoryId])
+    const groupsResult = await pool.query('SELECT id FROM groups WHERE category_id = $1 ORDER BY NULLIF(regexp_replace(name, \'\\D\', \'\', \'g\'), \'\')::int, name', [categoryId])
     const groupStandings = []
     for (const group of groupsResult.rows) {
       groupStandings.push({ groupId: group.id, standings: await getGroupStandings(group.id) })
