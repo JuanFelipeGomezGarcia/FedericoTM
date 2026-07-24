@@ -75,6 +75,7 @@ export default function CategoryPage() {
   const [tableAssignments, setTableAssignments] = useState<Record<number, any>>({}) // tableNumber -> { ... }
   const [tableUpdateTrigger, setTableUpdateTrigger] = useState(0)
   const [showStandings, setShowStandings] = useState<Record<number, boolean>>({})
+  const [draggedOverGroupId, setDraggedOverGroupId] = useState<number | null>(null)
 
   const toggleStandings = (groupId: number) => {
     setShowStandings(prev => ({ ...prev, [groupId]: !prev[groupId] }))
@@ -467,7 +468,63 @@ export default function CategoryPage() {
             const doneMatches = gMatches.filter(m => m.result).length
 
             return (
-              <Card key={group.id} className="border-border/60 bg-card/20 overflow-hidden shadow-xl">
+              <Card 
+                key={group.id} 
+                className={cn(
+                  "border-border/60 bg-card/20 overflow-hidden shadow-xl transition-all duration-200",
+                  draggedOverGroupId === group.id && "ring-2 ring-cyan-500 border-cyan-500 bg-cyan-950/20 scale-[1.01]"
+                )}
+                onDragOver={(e) => {
+                  if (isAdmin && !category.is_finished) {
+                    e.preventDefault()
+                    if (draggedOverGroupId !== group.id) {
+                      setDraggedOverGroupId(group.id)
+                    }
+                  }
+                }}
+                onDragLeave={() => {
+                  if (draggedOverGroupId === group.id) {
+                    setDraggedOverGroupId(null)
+                  }
+                }}
+                onDrop={async (e) => {
+                  if (!isAdmin || category.is_finished) return
+                  setDraggedOverGroupId(null)
+                  try {
+                    const dataStr = e.dataTransfer.getData('text/plain')
+                    if (!dataStr) return
+                    const { playerId, fromGroupId } = JSON.parse(dataStr)
+                    if (fromGroupId === group.id) return // Dropped on same group
+
+                    const confirmMove = confirm('¿Mover este jugador a este grupo? Se borrarán sus partidos anteriores en el grupo origen y se generarán nuevos en el grupo destino.')
+                    if (!confirmMove) return
+
+                    const token = localStorage.getItem('admin-token')
+                    const res = await fetch('/api/group-players', {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { Authorization: `Bearer ${token}` } : {})
+                      },
+                      body: JSON.stringify({
+                        playerId,
+                        fromGroupId,
+                        toGroupId: group.id,
+                        categoryId: parseInt(categoryId)
+                      })
+                    })
+
+                    if (res.ok) {
+                      fetchAll()
+                      fetchStandings()
+                    } else {
+                      alert('Error al mover el jugador')
+                    }
+                  } catch (err) {
+                    console.error(err)
+                  }
+                }}
+              >
                 <CardHeader className="bg-secondary/10 border-b border-border/40 py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -529,7 +586,18 @@ export default function CategoryPage() {
                       <CardContent className="py-4">
                         <ul className="space-y-1">
                           {players.map(p => (
-                            <li key={p.id} className="flex items-center gap-2">
+                            <li 
+                              key={p.id} 
+                              className={cn(
+                                "flex items-center gap-2 p-1.5 rounded-md transition-all duration-150 border border-transparent select-none",
+                                isAdmin && !category.is_finished && "hover:bg-cyan-500/10 hover:border-cyan-500/30 cursor-grab active:cursor-grabbing"
+                              )}
+                              draggable={isAdmin && !category.is_finished && editingPlayer?.id !== p.id}
+                              onDragStart={(e) => {
+                                e.dataTransfer.effectAllowed = 'move'
+                                e.dataTransfer.setData('text/plain', JSON.stringify({ playerId: p.id, fromGroupId: group.id }))
+                              }}
+                            >
                               {editingPlayer?.id === p.id ? (
                                 <>
                                   <input
@@ -554,6 +622,9 @@ export default function CategoryPage() {
                                 </>
                               ) : (
                                 <>
+                                  {isAdmin && !category.is_finished && (
+                                    <span className="text-xs text-muted-foreground/30 font-bold shrink-0">⠿</span>
+                                  )}
                                   <span className="flex-1 text-sm text-foreground">{p.name}</span>
                                   <button
                                     onClick={() => setEditingPlayer({ id: p.id, name: p.name })}
