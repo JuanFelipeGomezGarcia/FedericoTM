@@ -189,6 +189,7 @@ export default function BracketPage() {
 
   useEffect(() => { 
     fetchMatches()
+    fetchStandings()
     const fetchCategory = async () => {
       try {
         const res = await fetch(`/api/categories/${categoryId}`)
@@ -201,7 +202,7 @@ export default function BracketPage() {
       }
     }
     fetchCategory()
-  }, [fetchMatches, categoryId])
+  }, [fetchMatches, fetchStandings, categoryId])
 
   const setWinner = async (matchId: number, winnerId: number) => {
     setConfirmingSlot(null)
@@ -289,10 +290,9 @@ export default function BracketPage() {
 
   useEffect(() => {
     if (isFinished) {
-      fetchStandings()
       setShowRanking(true)
     }
-  }, [isFinished, fetchStandings])
+  }, [isFinished])
 
   const finalRanking = useMemo((): RankedPlayer[] => {
     if (!isFinished || matches.length === 0) return []
