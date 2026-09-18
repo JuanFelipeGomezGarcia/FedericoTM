@@ -832,43 +832,41 @@ function BracketMatrixModal({
               <tr>
                 {/* Corner cell */}
                 <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 border border-border/50 bg-secondary/30 w-10"></th>
-                {/* Column headers: 1 .. numBoxes */}
-                {round1Matches.map((_, idx) => (
+                {/* Column headers: 1 .. slotsPerBox (orden de clasificación) */}
+                {Array.from({ length: slotsPerBox }, (_, i) => (
                   <th
-                    key={idx}
-                    className="px-3 py-2 text-center text-[10px] font-black uppercase tracking-widest text-indigo-400 border border-border/50 bg-secondary/30 min-w-[130px]"
+                    key={i}
+                    className="px-3 py-2 text-center text-[10px] font-black uppercase tracking-widest text-indigo-400 border border-border/50 bg-secondary/30 min-w-[140px]"
                   >
-                    {idx + 1}
+                    {i + 1}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: slotsPerBox }, (_, slotIdx) => {
-                const isTopSlot = slotIdx === 0
+              {/* Una fila por cuadro (grupo) */}
+              {round1Matches.map((match, rowIdx) => {
+                // Los slots en orden de clasificación: p1 = 1ro, p2 = 2do
+                const slots = [
+                  { playerId: match.player1_id, playerName: match.player1_name, globalPos: match.match_number * 2 - 1 },
+                  { playerId: match.player2_id, playerName: match.player2_name, globalPos: match.match_number * 2 },
+                ]
                 return (
-                  <tr key={slotIdx} className="group/row">
-                    {/* Row label */}
+                  <tr key={match.id} className="group/row">
+                    {/* Etiqueta de fila: número de cuadro */}
                     <td className="px-3 py-2 text-right text-[10px] font-black text-muted-foreground/60 border border-border/50 bg-secondary/20">
-                      {slotIdx + 1}
+                      {match.match_number}
                     </td>
-                    {/* Cells: one per match/box */}
-                    {round1Matches.map((match) => {
-                      const playerId = isTopSlot ? match.player1_id : match.player2_id
-                      const playerName = isTopSlot ? match.player1_name : match.player2_name
-                      const globalPos = isTopSlot
-                        ? match.match_number * 2 - 1
-                        : match.match_number * 2
-                      // ↑ si está en la mitad superior de la llave, ↓ si está en la inferior
+                    {/* Columnas: 1ro clasificado, 2do clasificado, ... */}
+                    {slots.map(({ playerId, playerName, globalPos }, slotIdx) => {
                       const isUpperHalf = globalPos <= bracketHalf
                       const isBye = match.bye && !playerId
-
                       return (
                         <td
-                          key={match.id}
+                          key={slotIdx}
                           className={cn(
                             "px-3 py-2.5 border border-border/50 transition-colors",
-                            slotIdx % 2 === 0
+                            rowIdx % 2 === 0
                               ? "bg-card/60 group-hover/row:bg-indigo-500/5"
                               : "bg-secondary/20 group-hover/row:bg-indigo-500/5"
                           )}
@@ -886,8 +884,7 @@ function BracketMatrixModal({
                               >
                                 {isUpperHalf ? "↑" : "↓"}
                               </span>
-                              {/* Nombre + posición */}
-                              <span className="text-[11px] font-semibold text-foreground truncate max-w-[80px]">
+                              <span className="text-[11px] font-semibold text-foreground truncate max-w-[90px]">
                                 {playerName}
                               </span>
                               <span className="text-[10px] text-muted-foreground/70 shrink-0 font-mono">
@@ -906,6 +903,7 @@ function BracketMatrixModal({
             </tbody>
           </table>
         </div>
+
 
         {/* Legend */}
         <div className="mt-4 pt-4 border-t border-border/50 flex flex-wrap gap-4 text-[10px] text-muted-foreground shrink-0">
