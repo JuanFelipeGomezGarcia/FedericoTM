@@ -533,6 +533,7 @@ export default function BracketPage() {
         {showBracketMatrix && (
           <BracketMatrixModal
             matches={matches}
+            standings={standings}
             onClose={() => setShowBracketMatrix(false)}
           />
         )}
@@ -773,9 +774,11 @@ export default function BracketPage() {
 
 function BracketMatrixModal({
   matches,
+  standings,
   onClose,
 }: {
   matches: Match[]
+  standings: any[]
   onClose: () => void
 }) {
   // Partidos de ronda 1 ordenados por match_number (= número de cuadro)
@@ -787,23 +790,29 @@ function BracketMatrixModal({
   const totalPlayers = round1Matches.length * 2
   const bracketHalf = totalPlayers / 2
 
-  // 2 slots por cuadro: p1 (slot 1) y p2 (slot 2)
-  const slotsPerBox = 2
+  // Mapeamos los IDs de los jugadores a su posición global en la llave
+  const playerToGlobalPos = new Map<number, number>()
+  round1Matches.forEach((m) => {
+    if (m.player1_id) playerToGlobalPos.set(m.player1_id, m.match_number * 2 - 1)
+    if (m.player2_id) playerToGlobalPos.set(m.player2_id, m.match_number * 2)
+  })
 
-  // Posición global en la llave:
-  //   p1 del cuadro M → globalPos = 2*M - 1
-  //   p2 del cuadro M → globalPos = 2*M
-  // Flecha:
-  //   ↑ si globalPos <= bracketHalf  (mitad superior de la llave)
-  //   ↓ si globalPos >  bracketHalf  (mitad inferior de la llave)
-  // Ej. llave de 16: posiciones 1-8 → ↑, posiciones 9-16 → ↓
+  // Extraemos de standings solo a los jugadores que clasificaron (los que están en el bracket)
+  // standings es un array: [{ groupId, groupName, standings: [{id, name, ...}] }]
+  const groupsWithQualified = standings.map(g => {
+    const qualified = g.standings.filter((p: any) => playerToGlobalPos.has(p.id))
+    return { ...g, qualified }
+  }).filter(g => g.qualified.length > 0) // Solo grupos que tienen clasificados
+
+  // Encontramos el número máximo de clasificados por grupo para las columnas
+  const maxQualifiedPerGroup = groupsWithQualified.reduce((max, g) => Math.max(max, g.qualified.length), 0)
 
   return (
     <div
       className="fixed inset-0 z-[2000] flex items-center justify-center px-4 bg-background/80 backdrop-blur-sm animate-fade-in"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="w-full max-w-4xl glass-card p-6 border-indigo-500/30 animate-scale-in max-h-[90vh] flex flex-col">
+      <div className="w-full max-w-5xl glass-card p-6 border-indigo-500/30 animate-scale-in max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-5 shrink-0">
           <div className="flex items-center gap-3">
@@ -811,7 +820,7 @@ function BracketMatrixModal({
               <LayoutGrid className="w-5 h-5 text-indigo-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">Distribución de Cuadros</h3>
+              <h3 className="text-lg font-bold text-foreground">Distribución de Clasificados</h3>
               <p className="text-[11px] text-muted-foreground">
                 ↑ mitad superior de la llave &nbsp;·&nbsp; ↓ mitad inferior &nbsp;·&nbsp; (n) = posición en llave
               </p>
@@ -831,75 +840,80 @@ function BracketMatrixModal({
             <thead>
               <tr>
                 {/* Corner cell */}
-                <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 border border-border/50 bg-secondary/30 w-10"></th>
-                {/* Column headers: 1 .. slotsPerBox (orden de clasificación) */}
-                {Array.from({ length: slotsPerBox }, (_, i) => (
+                <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 border border-border/50 bg-secondary/30 w-16"></th>
+                {/* Column headers: Posición 1, 2, 3... */}
+                {Array.from({ length: maxQualifiedPerGroup }, (_, i) => (
                   <th
                     key={i}
                     className="px-3 py-2 text-center text-[10px] font-black uppercase tracking-widest text-indigo-400 border border-border/50 bg-secondary/30 min-w-[140px]"
                   >
-                    {i + 1}
+                    Posición {i + 1}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {/* Una fila por cuadro (grupo) */}
-              {round1Matches.map((match, rowIdx) => {
-                // Los slots en orden de clasificación: p1 = 1ro, p2 = 2do
-                const slots = [
-                  { playerId: match.player1_id, playerName: match.player1_name, globalPos: match.match_number * 2 - 1 },
-                  { playerId: match.player2_id, playerName: match.player2_name, globalPos: match.match_number * 2 },
-                ]
-                return (
-                  <tr key={match.id} className="group/row">
-                    {/* Etiqueta de fila: número de cuadro */}
-                    <td className="px-3 py-2 text-right text-[10px] font-black text-muted-foreground/60 border border-border/50 bg-secondary/20">
-                      {match.match_number}
-                    </td>
-                    {/* Columnas: 1ro clasificado, 2do clasificado, ... */}
-                    {slots.map(({ playerId, playerName, globalPos }, slotIdx) => {
-                      const isUpperHalf = globalPos <= bracketHalf
-                      const isBye = match.bye && !playerId
+              {/* Una fila por grupo (cuadro) */}
+              {groupsWithQualified.map((group, rowIdx) => (
+                <tr key={group.groupId} className="group/row">
+                  {/* Etiqueta de fila: nombre/número del grupo */}
+                  <td className="px-3 py-2 text-right text-[10px] font-black uppercase text-muted-foreground/80 border border-border/50 bg-secondary/20">
+                    {group.groupName || `Cuadro ${rowIdx + 1}`}
+                  </td>
+                  {/* Columnas: 1ro, 2do, 3ro... */}
+                  {Array.from({ length: maxQualifiedPerGroup }, (_, colIdx) => {
+                    const player = group.qualified[colIdx]
+                    
+                    if (!player) {
                       return (
-                        <td
-                          key={slotIdx}
-                          className={cn(
-                            "px-3 py-2.5 border border-border/50 transition-colors",
-                            rowIdx % 2 === 0
-                              ? "bg-card/60 group-hover/row:bg-indigo-500/5"
-                              : "bg-secondary/20 group-hover/row:bg-indigo-500/5"
-                          )}
-                        >
-                          {isBye ? (
-                            <span className="text-[10px] text-muted-foreground/40 italic">BYE</span>
-                          ) : playerName ? (
-                            <div className="flex items-center gap-1.5">
-                              {/* Flecha: mitad superior ↑ o inferior ↓ de la llave */}
-                              <span
-                                className={cn(
-                                  "text-base leading-none font-black shrink-0",
-                                  isUpperHalf ? "text-indigo-400" : "text-cyan-400"
-                                )}
-                              >
-                                {isUpperHalf ? "↑" : "↓"}
-                              </span>
-                              <span className="text-[11px] font-semibold text-foreground truncate max-w-[90px]">
-                                {playerName}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground/70 shrink-0 font-mono">
-                                ({globalPos})
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground/30">—</span>
-                          )}
+                        <td key={colIdx} className={cn(
+                          "px-3 py-2.5 border border-border/50 transition-colors text-center",
+                          rowIdx % 2 === 0 ? "bg-card/60" : "bg-secondary/20"
+                        )}>
+                          <span className="text-[10px] text-muted-foreground/30">—</span>
                         </td>
                       )
-                    })}
-                  </tr>
-                )
-              })}
+                    }
+
+                    const globalPos = playerToGlobalPos.get(player.id)
+                    const isUpperHalf = globalPos ? globalPos <= bracketHalf : false
+
+                    return (
+                      <td
+                        key={colIdx}
+                        className={cn(
+                          "px-3 py-2.5 border border-border/50 transition-colors",
+                          rowIdx % 2 === 0
+                            ? "bg-card/60 group-hover/row:bg-indigo-500/5"
+                            : "bg-secondary/20 group-hover/row:bg-indigo-500/5"
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {/* Flecha: mitad superior ↑ o inferior ↓ de la llave */}
+                          {globalPos && (
+                            <span
+                              className={cn(
+                                "text-base leading-none font-black shrink-0",
+                                isUpperHalf ? "text-indigo-400" : "text-cyan-400"
+                              )}
+                            >
+                              {isUpperHalf ? "↑" : "↓"}
+                            </span>
+                          )}
+                          <span className="text-[11px] font-semibold text-foreground truncate max-w-[90px]">
+                            {player.name}
+                          </span>
+                          {globalPos && (
+                            <span className="text-[10px] text-muted-foreground/70 shrink-0 font-mono">
+                              ({globalPos})
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
