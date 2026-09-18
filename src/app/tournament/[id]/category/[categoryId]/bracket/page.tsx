@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Trophy, Medal, Star, Award, Crown, ArrowDown, ArrowLeft, GripVertical, UserPlus, Plus } from 'lucide-react'
+import { Trophy, Medal, Star, Award, Crown, ArrowDown, ArrowLeft, GripVertical, UserPlus, Plus, LayoutGrid, X } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 import LightBackground from '@/components/LightBackground'
 import Logo from '@/components/Logo'
@@ -69,6 +69,7 @@ export default function BracketPage() {
   const [swapping, setSwapping] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newPlayerName, setNewPlayerName] = useState('')
+  const [showBracketMatrix, setShowBracketMatrix] = useState(false)
 
   // Tables logic (BD-backed)
   const [tablesCount, setTablesCount] = useState<number>(0)
@@ -442,6 +443,15 @@ export default function BracketPage() {
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />
+              {/* Botón Matriz de Cuadros */}
+              <button
+                onClick={() => setShowBracketMatrix(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold hover:bg-indigo-500/20 transition-all shadow-lg shadow-indigo-500/5 group"
+                title="Ver Matriz de Cuadros"
+              >
+                <LayoutGrid className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <span className="hidden sm:inline">Cuadros</span>
+              </button>
               {isAdmin && (<div className="flex items-center gap-3">
                 <div className="flex flex-col items-end">
                   <span className="hidden md:inline text-[10px] uppercase tracking-widest text-muted-foreground/60 font-bold bg-white/5 px-3 py-1 rounded-full border border-white/5">
@@ -518,6 +528,14 @@ export default function BracketPage() {
         )}
 
         <TableStatus tournamentId={tournamentId} isAdmin={isAdmin} updateTrigger={tableUpdateTrigger} />
+
+        {/* Modal Matriz de Cuadros */}
+        {showBracketMatrix && (
+          <BracketMatrixModal
+            matches={matches}
+            onClose={() => setShowBracketMatrix(false)}
+          />
+        )}
 
         <main className={cn("py-8 px-4 overflow-auto transition-opacity", swapping && "opacity-50 pointer-events-none")}>
           {isFinished && showRanking && finalRanking.length > 0 && (
@@ -749,6 +767,158 @@ export default function BracketPage() {
       </div>
     </DndContext>
   );
+}
+
+// ─── Bracket Matrix Modal ───────────────────────────────────────────────────
+
+function BracketMatrixModal({
+  matches,
+  onClose,
+}: {
+  matches: Match[]
+  onClose: () => void
+}) {
+  // Partidos de ronda 1 ordenados por match_number (= número de cuadro)
+  const round1Matches = matches
+    .filter((m) => m.round === 1)
+    .sort((a, b) => a.match_number - b.match_number)
+
+  // 2 slots por cuadro: posición superior (p1) e inferior (p2)
+  const slotsPerBox = 2
+
+  // Posición global en la llave:
+  //   p1 del cuadro M → posición = 2*M - 1
+  //   p2 del cuadro M → posición = 2*M
+
+  return (
+    <div
+      className="fixed inset-0 z-[2000] flex items-center justify-center px-4 bg-background/80 backdrop-blur-sm animate-fade-in"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-4xl glass-card p-6 border-indigo-500/30 animate-scale-in max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+              <LayoutGrid className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Distribución de Cuadros</h3>
+              <p className="text-[11px] text-muted-foreground">
+                ↑ posición superior del cuadro &nbsp;·&nbsp; ↓ posición inferior &nbsp;·&nbsp; (n) = posición en llave
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg bg-secondary/80 hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-auto flex-1">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr>
+                {/* Corner cell */}
+                <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 border border-border/50 bg-secondary/30 w-10"></th>
+                {/* Column headers: 1 .. numBoxes */}
+                {round1Matches.map((_, idx) => (
+                  <th
+                    key={idx}
+                    className="px-3 py-2 text-center text-[10px] font-black uppercase tracking-widest text-indigo-400 border border-border/50 bg-secondary/30 min-w-[130px]"
+                  >
+                    {idx + 1}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: slotsPerBox }, (_, slotIdx) => {
+                const isTop = slotIdx === 0
+                return (
+                  <tr key={slotIdx} className="group/row">
+                    {/* Row label: slot index */}
+                    <td className="px-3 py-2 text-right text-[10px] font-black text-muted-foreground/60 border border-border/50 bg-secondary/20">
+                      {slotIdx + 1}
+                    </td>
+                    {/* Cells: one per match/box */}
+                    {round1Matches.map((match) => {
+                      const playerId = isTop ? match.player1_id : match.player2_id
+                      const playerName = isTop ? match.player1_name : match.player2_name
+                      const globalPos = isTop
+                        ? match.match_number * 2 - 1
+                        : match.match_number * 2
+                      const isBye = match.bye && !playerId
+
+                      return (
+                        <td
+                          key={match.id}
+                          className={cn(
+                            "px-3 py-2.5 border border-border/50 transition-colors",
+                            slotIdx % 2 === 0
+                              ? "bg-card/60 group-hover/row:bg-indigo-500/5"
+                              : "bg-secondary/20 group-hover/row:bg-indigo-500/5"
+                          )}
+                        >
+                          {isBye ? (
+                            <span className="text-[10px] text-muted-foreground/40 italic">BYE</span>
+                          ) : playerName ? (
+                            <div className="flex items-center gap-1.5">
+                              {/* Flecha dirección */}
+                              <span
+                                className={cn(
+                                  "text-base leading-none font-black shrink-0",
+                                  isTop ? "text-indigo-400" : "text-cyan-400"
+                                )}
+                              >
+                                {isTop ? "↑" : "↓"}
+                              </span>
+                              {/* Nombre + posición */}
+                              <span className="text-[11px] font-semibold text-foreground truncate max-w-[80px]">
+                                {playerName}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground/70 shrink-0 font-mono">
+                                ({globalPos})
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground/30">—</span>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-4 pt-4 border-t border-border/50 flex flex-wrap gap-4 text-[10px] text-muted-foreground shrink-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-indigo-400 font-black text-sm">↑</span>
+            <span>Posición superior del cuadro</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-cyan-400 font-black text-sm">↓</span>
+            <span>Posición inferior del cuadro</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-muted-foreground/80">(n)</span>
+            <span>Posición en la llave</span>
+          </div>
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-indigo-400 font-bold">{round1Matches.length}</span>
+            <span>cuadros · llave de {round1Matches.length * 2}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function PlayerRow({
