@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Trophy, Medal, Star, Award, Crown, ArrowDown, ArrowLeft, GripVertical, UserPlus, Plus, LayoutGrid, X } from 'lucide-react'
+import { Trophy, Medal, Star, Award, Crown, ArrowDown, ArrowLeft, GripVertical, UserPlus, Plus, LayoutGrid, X, Shuffle } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 import LightBackground from '@/components/LightBackground'
 import Logo from '@/components/Logo'
@@ -288,6 +288,30 @@ export default function BracketPage() {
     }
   }
 
+  const reshuffleBracket = async () => {
+    if (!window.confirm("¿Estás seguro de que deseas reordenar las llaves? Se volverán a sortear al azar las posiciones no fijas y se borrará el orden actual.")) {
+      return
+    }
+    setSwapping(true)
+    try {
+      const res = await fetch('/api/generate-elimination', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryId })
+      })
+      if (res.ok) {
+        fetchMatches() // Refetch matches to update the view
+      } else {
+        const err = await res.json()
+        alert(err.error || 'Error al reordenar las llaves')
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSwapping(false)
+    }
+  }
+
   useEffect(() => {
     if (isFinished) {
       setShowRanking(true)
@@ -464,14 +488,24 @@ export default function BracketPage() {
                   )}
                 </div>
                 {canDrag && (
-                  <button 
-                    onClick={() => setShowAddModal(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition-all shadow-lg shadow-cyan-500/5 group"
-                    title="Agregar Jugador Manual"
-                  >
-                    <UserPlus className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span className="hidden sm:inline">Agregar</span>
-                  </button>
+                  <>
+                    <button 
+                      onClick={reshuffleBracket}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-all shadow-lg shadow-amber-500/5 group"
+                      title="Reordenar llaves al azar"
+                    >
+                      <Shuffle className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                      <span className="hidden sm:inline">Reordenar</span>
+                    </button>
+                    <button 
+                      onClick={() => setShowAddModal(true)}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition-all shadow-lg shadow-cyan-500/5 group"
+                      title="Agregar Jugador Manual"
+                    >
+                      <UserPlus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                      <span className="hidden sm:inline">Agregar</span>
+                    </button>
+                  </>
                 )}
               </div>
               )}
