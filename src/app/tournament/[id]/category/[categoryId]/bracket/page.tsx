@@ -783,12 +783,20 @@ function BracketMatrixModal({
     .filter((m) => m.round === 1)
     .sort((a, b) => a.match_number - b.match_number)
 
-  // 2 slots por cuadro: posición superior (p1) e inferior (p2)
+  // Total de jugadores y punto medio de la llave
+  const totalPlayers = round1Matches.length * 2
+  const bracketHalf = totalPlayers / 2
+
+  // 2 slots por cuadro: p1 (slot 1) y p2 (slot 2)
   const slotsPerBox = 2
 
   // Posición global en la llave:
-  //   p1 del cuadro M → posición = 2*M - 1
-  //   p2 del cuadro M → posición = 2*M
+  //   p1 del cuadro M → globalPos = 2*M - 1
+  //   p2 del cuadro M → globalPos = 2*M
+  // Flecha:
+  //   ↑ si globalPos <= bracketHalf  (mitad superior de la llave)
+  //   ↓ si globalPos >  bracketHalf  (mitad inferior de la llave)
+  // Ej. llave de 16: posiciones 1-8 → ↑, posiciones 9-16 → ↓
 
   return (
     <div
@@ -805,7 +813,7 @@ function BracketMatrixModal({
             <div>
               <h3 className="text-lg font-bold text-foreground">Distribución de Cuadros</h3>
               <p className="text-[11px] text-muted-foreground">
-                ↑ posición superior del cuadro &nbsp;·&nbsp; ↓ posición inferior &nbsp;·&nbsp; (n) = posición en llave
+                ↑ mitad superior de la llave &nbsp;·&nbsp; ↓ mitad inferior &nbsp;·&nbsp; (n) = posición en llave
               </p>
             </div>
           </div>
@@ -837,20 +845,22 @@ function BracketMatrixModal({
             </thead>
             <tbody>
               {Array.from({ length: slotsPerBox }, (_, slotIdx) => {
-                const isTop = slotIdx === 0
+                const isTopSlot = slotIdx === 0
                 return (
                   <tr key={slotIdx} className="group/row">
-                    {/* Row label: slot index */}
+                    {/* Row label */}
                     <td className="px-3 py-2 text-right text-[10px] font-black text-muted-foreground/60 border border-border/50 bg-secondary/20">
                       {slotIdx + 1}
                     </td>
                     {/* Cells: one per match/box */}
                     {round1Matches.map((match) => {
-                      const playerId = isTop ? match.player1_id : match.player2_id
-                      const playerName = isTop ? match.player1_name : match.player2_name
-                      const globalPos = isTop
+                      const playerId = isTopSlot ? match.player1_id : match.player2_id
+                      const playerName = isTopSlot ? match.player1_name : match.player2_name
+                      const globalPos = isTopSlot
                         ? match.match_number * 2 - 1
                         : match.match_number * 2
+                      // ↑ si está en la mitad superior de la llave, ↓ si está en la inferior
+                      const isUpperHalf = globalPos <= bracketHalf
                       const isBye = match.bye && !playerId
 
                       return (
@@ -867,14 +877,14 @@ function BracketMatrixModal({
                             <span className="text-[10px] text-muted-foreground/40 italic">BYE</span>
                           ) : playerName ? (
                             <div className="flex items-center gap-1.5">
-                              {/* Flecha dirección */}
+                              {/* Flecha: mitad superior ↑ o inferior ↓ de la llave */}
                               <span
                                 className={cn(
                                   "text-base leading-none font-black shrink-0",
-                                  isTop ? "text-indigo-400" : "text-cyan-400"
+                                  isUpperHalf ? "text-indigo-400" : "text-cyan-400"
                                 )}
                               >
-                                {isTop ? "↑" : "↓"}
+                                {isUpperHalf ? "↑" : "↓"}
                               </span>
                               {/* Nombre + posición */}
                               <span className="text-[11px] font-semibold text-foreground truncate max-w-[80px]">
@@ -901,11 +911,11 @@ function BracketMatrixModal({
         <div className="mt-4 pt-4 border-t border-border/50 flex flex-wrap gap-4 text-[10px] text-muted-foreground shrink-0">
           <div className="flex items-center gap-1.5">
             <span className="text-indigo-400 font-black text-sm">↑</span>
-            <span>Posición superior del cuadro</span>
+            <span>Mitad superior de la llave (pos. 1–{bracketHalf})</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-cyan-400 font-black text-sm">↓</span>
-            <span>Posición inferior del cuadro</span>
+            <span>Mitad inferior de la llave (pos. {bracketHalf + 1}–{totalPlayers})</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="font-mono text-muted-foreground/80">(n)</span>
